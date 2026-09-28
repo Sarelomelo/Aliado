@@ -15,7 +15,6 @@ function esHoy(iso) {
   return d.toDateString() === hoy.toDateString()
 }
 
-// Calcula cuántos días han pasado desde una fecha
 function diasDesde(iso) {
   const d = new Date(iso)
   const hoy = new Date()
@@ -25,7 +24,6 @@ function diasDesde(iso) {
   return Math.floor(diff / (1000 * 60 * 60 * 24))
 }
 
-// Devuelve el color según los días de antigüedad
 function colorAntiguedad(dias) {
   if (dias < 7) {
     return {
@@ -55,7 +53,6 @@ function colorAntiguedad(dias) {
   }
 }
 
-// Texto amigable para los días
 function textoDias(dias) {
   if (dias === 0) return 'hoy'
   if (dias === 1) return 'hace 1 día'
@@ -182,10 +179,11 @@ function Configuracion({ onGuardar }) {
 }
 
 // ---------- PANTALLA: INICIO ----------
-function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onConfig }) {
+function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onProductos, onConfig }) {
   const [fiados] = useLocalStorage('fiados', [])
   const [mermas] = useLocalStorage('mermas', [])
   const [cierres] = useLocalStorage('cierres', [])
+  const [productos] = useLocalStorage('productos', [])
 
   const totalFiado = fiados.reduce((s, f) => {
     const pagado = f.abonos.reduce((a, ab) => a + ab.monto, 0)
@@ -200,11 +198,18 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onConfig }) {
     const deuda = f.monto - pagado
     if (deuda <= 0) return false
     const ultimoMovimiento =
-      f.abonos.length > 0
-        ? f.abonos[f.abonos.length - 1].fecha
-        : f.fecha
+      f.abonos.length > 0 ? f.abonos[f.abonos.length - 1].fecha : f.fecha
     return diasDesde(ultimoMovimiento) >= 15
   }).length
+
+  const valorInventario = productos.reduce(
+    (s, p) => s + (p.precioCompra || 0) * (p.stock || 0),
+    0
+  )
+
+  const productosBajos = productos.filter(
+    p => p.stock <= p.stockMinimo && p.stockMinimo > 0
+  ).length
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
@@ -283,9 +288,22 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onConfig }) {
             </>
           )}
         </div>
+
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-sm text-gray-500">Productos en inventario</p>
+          <p className="text-2xl font-bold text-purple-600">
+            $ {valorInventario.toFixed(2)}
+          </p>
+          <p className="text-xs text-gray-400">{productos.length} productos</p>
+          {productosBajos > 0 && (
+            <p className="text-xs text-red-600 font-medium mt-1">
+              ⚠️ {productosBajos} con stock bajo
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <button
           onClick={onFiado}
           className="bg-green-600 text-white rounded-xl py-4 font-medium shadow-sm active:bg-green-700"
@@ -297,6 +315,494 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onConfig }) {
           className="bg-orange-500 text-white rounded-xl py-4 font-medium shadow-sm active:bg-orange-600"
         >
           + Merma
+        </button>
+      </div>
+
+      <button
+        onClick={onProductos}
+        className="w-full bg-purple-600 text-white rounded-xl py-4 font-medium shadow-sm active:bg-purple-700"
+      >
+        Ver productos
+      </button>
+    </div>
+  )
+}
+
+// ---------- PANTALLA: PRODUCTOS ----------
+function Productos({ onVolver }) {
+  const [productos, setProductos] = useLocalStorage('productos', [])
+  const [vista, setVista] = useState('lista') // 'lista' | 'formulario' | 'agregarStock'
+  const [editandoId, setEditandoId] = useState(null)
+  const [agregandoStockId, setAgregandoStockId] = useState(null)
+  const [busqueda, setBusqueda] = useState('')
+
+  // Formulario de producto
+  const [nombre, setNombre] = useState('')
+  const [precioCompra, setPrecioCompra] = useState('')
+  const [precioVenta, setPrecioVenta] = useState('')
+  const [stock, setStock] = useState('')
+  const [stockMinimo, setStockMinimo] = useState('')
+
+  // Formulario de agregar stock
+  const [cantidadLote, setCantidadLote] = useState('')
+  const [costoLote, setCostoLote] = useState('')
+
+  const valorInventario = productos.reduce(
+    (s, p) => s + (p.precioCompra || 0) * (p.stock || 0),
+    0
+  )
+
+  const productosBajos = productos.filter(
+    p => p.stock <= p.stockMinimo && p.stockMinimo > 0
+  )
+
+  const productosFiltrados = productos.filter(p =>
+    p.nombre.toLowerCase().includes(busqueda.toLowerCase())
+  )
+
+  const productosOrdenados = [...productosFiltrados].sort((a, b) => {
+    const aBajo = a.stock <= a.stockMinimo && a.stockMinimo > 0
+    const bBajo = b.stock <= b.stockMinimo && b.stockMinimo > 0
+    if (aBajo && !bBajo) return -1
+    if (bBajo && !aBajo) return 1
+    return a.nombre.localeCompare(b.nombre)
+  })
+
+  const productoStock = productos.find(p => p.id === agregandoStockId)
+
+  function abrirNuevo() {
+    setEditandoId(null)
+    setNombre('')
+    setPrecioCompra('')
+    setPrecioVenta('')
+    setStock('')
+    setStockMinimo('')
+    setVista('formulario')
+  }
+
+  function abrirEdicion(p) {
+    setEditandoId(p.id)
+    setNombre(p.nombre)
+    setPrecioCompra(String(p.precioCompra))
+    setPrecioVenta(String(p.precioVenta))
+    setStock(String(p.stock))
+    setStockMinimo(String(p.stockMinimo))
+    setVista('formulario')
+  }
+
+  function abrirAgregarStock(p) {
+    setAgregandoStockId(p.id)
+    setCantidadLote('')
+    setCostoLote(String(p.precioCompra))
+    setVista('agregarStock')
+  }
+
+  function guardarProducto(e) {
+    e.preventDefault()
+    if (!nombre.trim()) return
+
+    const datos = {
+      nombre: nombre.trim(),
+      precioCompra: parseFloat(precioCompra) || 0,
+      precioVenta: parseFloat(precioVenta) || 0,
+      stock: parseInt(stock) || 0,
+      stockMinimo: parseInt(stockMinimo) || 0,
+    }
+
+    if (editandoId) {
+      const actualizado = productos.map(p =>
+        p.id === editandoId ? { ...p, ...datos } : p
+      )
+      setProductos(actualizado)
+    } else {
+      const nuevo = {
+        id: Date.now(),
+        ...datos,
+        fecha: new Date().toISOString(),
+      }
+      setProductos([nuevo, ...productos])
+    }
+
+    setEditandoId(null)
+    setNombre('')
+    setPrecioCompra('')
+    setPrecioVenta('')
+    setStock('')
+    setStockMinimo('')
+    setVista('lista')
+  }
+
+  function guardarStock(e) {
+    e.preventDefault()
+    const cant = parseInt(cantidadLote)
+    if (!cant || cant <= 0) return
+
+    const costo = parseFloat(costoLote)
+
+    const actualizado = productos.map(p => {
+      if (p.id === agregandoStockId) {
+        const nuevoStock = p.stock + cant
+        return {
+          ...p,
+          stock: nuevoStock,
+          // Si se especificó costo, actualizar precio de compra
+          precioCompra: costo > 0 ? costo : p.precioCompra,
+        }
+      }
+      return p
+    })
+    setProductos(actualizado)
+    setAgregandoStockId(null)
+    setCantidadLote('')
+    setCostoLote('')
+    setVista('lista')
+  }
+
+  function eliminarProducto(id) {
+    if (!confirm('¿Eliminar este producto?')) return
+    setProductos(productos.filter(p => p.id !== id))
+  }
+
+  // Vista: AGREGAR STOCK
+  if (vista === 'agregarStock' && productoStock) {
+    const cant = parseInt(cantidadLote) || 0
+    const nuevoStock = productoStock.stock + cant
+
+    return (
+      <div className="min-h-screen bg-gray-100 p-4">
+        <button
+          onClick={() => {
+            setVista('lista')
+            setAgregandoStockId(null)
+          }}
+          className="text-blue-600 font-medium mb-4"
+        >
+          ← Cancelar
+        </button>
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">
+          Agregar stock
+        </h1>
+
+        <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
+          <p className="font-medium text-gray-800">{productoStock.nombre}</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Stock actual: <span className="font-bold">{productoStock.stock}</span> unidades
+          </p>
+          <p className="text-xs text-gray-400">
+            Compra: ${productoStock.precioCompra.toFixed(2)} · Venta: $
+            {productoStock.precioVenta.toFixed(2)}
+          </p>
+        </div>
+
+        <form onSubmit={guardarStock} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ¿Cuántas unidades llegaron?
+            </label>
+            <input
+              type="number"
+              step="1"
+              value={cantidadLote}
+              onChange={(e) => setCantidadLote(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-4 bg-white text-2xl text-center font-bold"
+              placeholder="0"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Costo por unidad (opcional)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={costoLote}
+              onChange={(e) => setCostoLote(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
+              placeholder="0.00"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Si el precio cambió, actualízalo aquí. Si no, déjalo igual.
+            </p>
+          </div>
+
+          {cant > 0 && (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-600">Stock actual</span>
+                <span className="font-medium">{productoStock.stock}</span>
+              </div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-600">Entrada</span>
+                <span className="font-medium text-green-600">+ {cant}</span>
+              </div>
+              <div className="flex justify-between text-base border-t border-purple-200 pt-2 mt-2">
+                <span className="font-semibold text-purple-800">Nuevo stock</span>
+                <span className="font-bold text-purple-800">{nuevoStock}</span>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="w-full bg-purple-600 text-white rounded-xl py-4 font-medium shadow-sm active:bg-purple-700"
+          >
+            Agregar al inventario
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  // Vista: FORMULARIO de producto
+  if (vista === 'formulario') {
+    const esEdicion = editandoId !== null
+    return (
+      <div className="min-h-screen bg-gray-100 p-4">
+        <button
+          onClick={() => {
+            setVista('lista')
+            setEditandoId(null)
+          }}
+          className="text-blue-600 font-medium mb-4"
+        >
+          ← Cancelar
+        </button>
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">
+          {esEdicion ? 'Editar producto' : 'Nuevo producto'}
+        </h1>
+
+        <form onSubmit={guardarProducto} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre del producto
+            </label>
+            <input
+              type="text"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
+              placeholder="Ej: Arroz 2kg"
+              autoFocus
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Precio de compra
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={precioCompra}
+                onChange={(e) => setPrecioCompra(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Precio de venta
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={precioVenta}
+                onChange={(e) => setPrecioVenta(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          {parseFloat(precioVenta) > 0 && parseFloat(precioCompra) > 0 && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <p className="text-xs text-purple-700">
+                Margen:{' '}
+                <span className="font-bold">
+                  {(
+                    ((parseFloat(precioVenta) - parseFloat(precioCompra)) /
+                      parseFloat(precioVenta)) *
+                    100
+                  ).toFixed(1)}
+                  %
+                </span>{' '}
+                · Ganancia por unidad:{' '}
+                <span className="font-bold">
+                  ${' '}
+                  {(
+                    parseFloat(precioVenta) - parseFloat(precioCompra)
+                  ).toFixed(2)}
+                </span>
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Stock actual
+              </label>
+              <input
+                type="number"
+                step="1"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Stock mínimo
+              </label>
+              <input
+                type="number"
+                step="1"
+                value={stockMinimo}
+                onChange={(e) => setStockMinimo(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-400">
+            El stock mínimo es la cantidad a partir de la cual la app te
+            avisará que debes comprar más.
+          </p>
+
+          <button
+            type="submit"
+            className="w-full bg-purple-600 text-white rounded-xl py-4 font-medium shadow-sm active:bg-purple-700"
+          >
+            {esEdicion ? 'Actualizar producto' : 'Guardar producto'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  // Vista: LISTA
+  return (
+    <div className="min-h-screen bg-gray-100 p-4 pb-24">
+      <button onClick={onVolver} className="text-blue-600 font-medium mb-4">
+        ← Volver
+      </button>
+      <h1 className="text-2xl font-bold text-gray-800 mb-1">Productos</h1>
+      <p className="text-3xl font-bold text-purple-600 mb-2">
+        $ {valorInventario.toFixed(2)}
+      </p>
+      <p className="text-xs text-gray-500 mb-4">
+        {productos.length} productos en inventario
+      </p>
+
+      {productosBajos.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+          <p className="text-xs text-red-700 font-medium">
+            ⚠️ {productosBajos.length} producto
+            {productosBajos.length !== 1 ? 's' : ''} con stock bajo
+          </p>
+        </div>
+      )}
+
+      {productos.length > 0 && (
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white mb-4"
+          placeholder="🔍 Buscar producto..."
+        />
+      )}
+
+      {productos.length === 0 ? (
+        <div className="bg-white rounded-xl p-6 text-center shadow-sm">
+          <p className="text-gray-500">No hay productos registrados</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Toca "+ Nuevo producto" para empezar
+          </p>
+        </div>
+      ) : productosOrdenados.length === 0 ? (
+        <div className="bg-white rounded-xl p-6 text-center shadow-sm">
+          <p className="text-gray-500">No se encontraron productos</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {productosOrdenados.map(p => {
+            const stockBajo = p.stock <= p.stockMinimo && p.stockMinimo > 0
+            const margenP =
+              p.precioVenta > 0
+                ? ((p.precioVenta - p.precioCompra) / p.precioVenta) * 100
+                : 0
+            return (
+              <div
+                key={p.id}
+                className={`bg-white rounded-xl p-4 shadow-sm border-l-4 ${
+                  stockBajo ? 'border-red-500' : 'border-transparent'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <button
+                    onClick={() => abrirEdicion(p)}
+                    className="flex-1 text-left"
+                  >
+                    <p className="font-medium text-gray-800">{p.nombre}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <p className="text-xs text-gray-500">
+                        Stock: {p.stock}
+                        {p.stockMinimo > 0 && ` · Mín: ${p.stockMinimo}`}
+                      </p>
+                      {stockBajo && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+                          ⚠️ Stock bajo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Compra: ${p.precioCompra.toFixed(2)} · Venta: $
+                      {p.precioVenta.toFixed(2)} · Margen: {margenP.toFixed(0)}%
+                    </p>
+                  </button>
+                  <p className="font-bold text-purple-600 ml-2">
+                    ${(p.precioCompra * p.stock).toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => abrirAgregarStock(p)}
+                    className="bg-purple-600 text-white rounded-lg py-2 text-sm font-medium active:bg-purple-700"
+                  >
+                    + Stock
+                  </button>
+                  <button
+                    onClick={() => abrirEdicion(p)}
+                    className="bg-gray-200 text-gray-700 rounded-lg py-2 text-sm font-medium active:bg-gray-300"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => eliminarProducto(p.id)}
+                    className="bg-red-50 text-red-600 rounded-lg py-2 text-sm font-medium active:bg-red-100"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="fixed bottom-4 left-4 right-4">
+        <button
+          onClick={abrirNuevo}
+          className="w-full bg-purple-600 text-white rounded-xl py-4 font-medium shadow-lg active:bg-purple-700"
+        >
+          + Nuevo producto
         </button>
       </div>
     </div>
@@ -475,7 +981,6 @@ function Fiado({ onVolver, tienda }) {
     window.open(url, '_blank')
   }
 
-  // Vista: NUEVO o EDITAR
   if (vista === 'nuevo' || vista === 'editar') {
     const esEdicion = vista === 'editar'
     return (
@@ -551,7 +1056,6 @@ function Fiado({ onVolver, tienda }) {
     )
   }
 
-  // Vista: DETALLE
   if (vista === 'detalle' && seleccionado) {
     const deuda = calcularDeuda(seleccionado)
     const recordatorios = seleccionado.recordatorios || []
@@ -732,7 +1236,6 @@ function Fiado({ onVolver, tienda }) {
     )
   }
 
-  // Vista: LISTA
   return (
     <div className="min-h-screen bg-gray-100 p-4 pb-24">
       <button onClick={onVolver} className="text-blue-600 font-medium mb-4">
@@ -813,7 +1316,6 @@ function Fiado({ onVolver, tienda }) {
   )
 }
 
-// Sub-componente para editar un abono en línea
 function AbonoEdicion({ montoInicial, onCancelar, onGuardar }) {
   const [valor, setValor] = useState(String(montoInicial))
 
@@ -1333,12 +1835,16 @@ function App() {
   if (pantalla === 'cerrarDia') {
     return <CerrarDia onVolver={() => setPantalla('inicio')} />
   }
+  if (pantalla === 'productos') {
+    return <Productos onVolver={() => setPantalla('inicio')} />
+  }
   return (
     <Inicio
       tienda={tienda}
       onFiado={() => setPantalla('fiado')}
       onMerma={() => setPantalla('merma')}
       onCerrarDia={() => setPantalla('cerrarDia')}
+      onProductos={() => setPantalla('productos')}
       onConfig={() => setPantalla('config')}
     />
   )

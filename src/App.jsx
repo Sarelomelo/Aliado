@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 function formatearFecha(iso) {
   const d = new Date(iso)
@@ -85,10 +85,26 @@ function formatearTelefonoWhatsApp(tel) {
 }
 
 // ---------- CONFIGURACIÓN INICIAL ----------
-function Configuracion({ onGuardar }) {
+function Configuracion({ onGuardar, modoEdicion }) {
   const [nombreTienda, setNombreTienda] = useState('')
   const [nombreDueno, setNombreDueno] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [mensajeBackup, setMensajeBackup] = useState('')
+
+  const fileInputRef = useRef(null)
+
+  // Cargar datos si es edición
+  useEffect(() => {
+    if (modoEdicion) {
+      const guardado = localStorage.getItem('tienda')
+      if (guardado) {
+        const t = JSON.parse(guardado)
+        setNombreTienda(t.nombreTienda || '')
+        setNombreDueno(t.nombreDueno || '')
+        setTelefono(t.telefono || '')
+      }
+    }
+  }, [modoEdicion])
 
   function guardar(e) {
     e.preventDefault()
@@ -98,6 +114,94 @@ function Configuracion({ onGuardar }) {
       nombreDueno: nombreDueno.trim(),
       telefono: telefono.trim(),
     })
+  }
+
+  function descargarRespaldo() {
+    const datos = {
+      version: 1,
+      fecha: new Date().toISOString(),
+      tienda: JSON.parse(localStorage.getItem('tienda') || 'null'),
+      fiados: JSON.parse(localStorage.getItem('fiados') || '[]'),
+      mermas: JSON.parse(localStorage.getItem('mermas') || '[]'),
+      cierres: JSON.parse(localStorage.getItem('cierres') || '[]'),
+      productos: JSON.parse(localStorage.getItem('productos') || '[]'),
+    }
+
+    const blob = new Blob([JSON.stringify(datos, null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const fecha = new Date().toISOString().split('T')[0]
+    a.download = `aliado-respaldo-${fecha}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setMensajeBackup('✅ Respaldo descargado. Guárdalo en un lugar seguro.')
+  }
+
+  function enviarRespaldoWhatsApp() {
+    const datos = {
+      version: 1,
+      fecha: new Date().toISOString(),
+      tienda: JSON.parse(localStorage.getItem('tienda') || 'null'),
+      fiados: JSON.parse(localStorage.getItem('fiados') || '[]'),
+      mermas: JSON.parse(localStorage.getItem('mermas') || '[]'),
+      cierres: JSON.parse(localStorage.getItem('cierres') || '[]'),
+      productos: JSON.parse(localStorage.getItem('productos') || '[]'),
+    }
+
+    const texto = JSON.stringify(datos)
+    const textoCodificado = encodeURIComponent(texto)
+
+    // Advertencia: WhatsApp tiene límite de caracteres, esto funciona
+    // para tiendas pequeñas. Para grandes, usar la opción de descargar.
+    if (texto.length > 5000) {
+      setMensajeBackup(
+        '⚠️ Los datos son muy grandes para WhatsApp. Usa "Descargar respaldo".'
+      )
+      return
+    }
+
+    const url = `https://wa.me/?text=${textoCodificado}`
+    window.open(url, '_blank')
+  }
+
+  function restaurarRespaldo(e) {
+    const archivo = e.target.files[0]
+    if (!archivo) return
+
+    if (!confirm('⚠️ Esto reemplazará TODOS los datos actuales. ¿Continuar?')) {
+      e.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const datos = JSON.parse(event.target.result)
+
+        if (datos.tienda)
+          localStorage.setItem('tienda', JSON.stringify(datos.tienda))
+        if (datos.fiados)
+          localStorage.setItem('fiados', JSON.stringify(datos.fiados))
+        if (datos.mermas)
+          localStorage.setItem('mermas', JSON.stringify(datos.mermas))
+        if (datos.cierres)
+          localStorage.setItem('cierres', JSON.stringify(datos.cierres))
+        if (datos.productos)
+          localStorage.setItem('productos', JSON.stringify(datos.productos))
+
+        setMensajeBackup('✅ Respaldo restaurado. Recargando...')
+        setTimeout(() => location.reload(), 1000)
+      } catch (err) {
+        setMensajeBackup('❌ Error al leer el archivo. Verifica que sea válido.')
+      }
+    }
+    reader.readAsText(archivo)
+    e.target.value = ''
   }
 
   return (
@@ -118,7 +222,7 @@ function Configuracion({ onGuardar }) {
 
       <div className="mb-6">
         <h2 className="text-lg font-bold text-gray-800">
-          Configura tu tienda en 1 minuto
+          {modoEdicion ? 'Editar tienda' : 'Configura tu tienda en 1 minuto'}
         </h2>
       </div>
 
@@ -167,13 +271,70 @@ function Configuracion({ onGuardar }) {
           type="submit"
           className="w-full bg-blue-600 text-white rounded-xl py-4 font-medium shadow-sm active:bg-blue-700"
         >
-          Empezar a usar Aliado
+          {modoEdicion ? 'Guardar cambios' : 'Empezar a usar Aliado'}
         </button>
       </form>
 
-      <p className="text-xs text-gray-400 text-center mt-6">
-        Aliado — Tu aliado en la tienda
-      </p>
+      {/* Respaldo solo en modo edición */}
+      {modoEdicion && (
+        <div className="mt-8">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">
+            💾 Respaldo de datos
+          </h3>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
+            <p className="text-xs text-gray-500">
+              Descarga una copia de tus datos para no perderlos si cambias de
+              celular o si algo pasa.
+            </p>
+
+            <button
+              onClick={descargarRespaldo}
+              className="w-full bg-blue-600 text-white rounded-lg py-3 font-medium text-sm active:bg-blue-700"
+            >
+              ⬇️ Descargar respaldo
+            </button>
+
+            <button
+              onClick={enviarRespaldoWhatsApp}
+              className="w-full bg-green-500 text-white rounded-lg py-3 font-medium text-sm active:bg-green-600"
+            >
+              📱 Enviar por WhatsApp
+            </button>
+
+            <button
+              onClick={() => fileInputRef.current.click()}
+              className="w-full bg-gray-200 text-gray-700 rounded-lg py-3 font-medium text-sm active:bg-gray-300"
+            >
+              ⬆️ Restaurar respaldo
+            </button>
+
+            <input
+              type="file"
+              accept=".json"
+              ref={fileInputRef}
+              onChange={restaurarRespaldo}
+              className="hidden"
+            />
+
+            {mensajeBackup && (
+              <p className="text-xs text-center py-2 px-3 bg-gray-50 rounded-lg text-gray-700">
+                {mensajeBackup}
+              </p>
+            )}
+          </div>
+
+          <p className="text-xs text-gray-400 text-center mt-4">
+            Aliado — Tu aliado en la tienda
+          </p>
+        </div>
+      )}
+
+      {!modoEdicion && (
+        <p className="text-xs text-gray-400 text-center mt-6">
+          Aliado — Tu aliado en la tienda
+        </p>
+      )}
     </div>
   )
 }
@@ -331,19 +492,17 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onProductos, onConfig }
 // ---------- PANTALLA: PRODUCTOS ----------
 function Productos({ onVolver }) {
   const [productos, setProductos] = useLocalStorage('productos', [])
-  const [vista, setVista] = useState('lista') // 'lista' | 'formulario' | 'agregarStock'
+  const [vista, setVista] = useState('lista')
   const [editandoId, setEditandoId] = useState(null)
   const [agregandoStockId, setAgregandoStockId] = useState(null)
   const [busqueda, setBusqueda] = useState('')
 
-  // Formulario de producto
   const [nombre, setNombre] = useState('')
   const [precioCompra, setPrecioCompra] = useState('')
   const [precioVenta, setPrecioVenta] = useState('')
   const [stock, setStock] = useState('')
   const [stockMinimo, setStockMinimo] = useState('')
 
-  // Formulario de agregar stock
   const [cantidadLote, setCantidadLote] = useState('')
   const [costoLote, setCostoLote] = useState('')
 
@@ -445,7 +604,6 @@ function Productos({ onVolver }) {
         return {
           ...p,
           stock: nuevoStock,
-          // Si se especificó costo, actualizar precio de compra
           precioCompra: costo > 0 ? costo : p.precioCompra,
         }
       }
@@ -463,7 +621,6 @@ function Productos({ onVolver }) {
     setProductos(productos.filter(p => p.id !== id))
   }
 
-  // Vista: AGREGAR STOCK
   if (vista === 'agregarStock' && productoStock) {
     const cant = parseInt(cantidadLote) || 0
     const nuevoStock = productoStock.stock + cant
@@ -486,7 +643,8 @@ function Productos({ onVolver }) {
         <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
           <p className="font-medium text-gray-800">{productoStock.nombre}</p>
           <p className="text-sm text-gray-500 mt-1">
-            Stock actual: <span className="font-bold">{productoStock.stock}</span> unidades
+            Stock actual:{' '}
+            <span className="font-bold">{productoStock.stock}</span> unidades
           </p>
           <p className="text-xs text-gray-400">
             Compra: ${productoStock.precioCompra.toFixed(2)} · Venta: $
@@ -522,9 +680,6 @@ function Productos({ onVolver }) {
               className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
               placeholder="0.00"
             />
-            <p className="text-xs text-gray-400 mt-1">
-              Si el precio cambió, actualízalo aquí. Si no, déjalo igual.
-            </p>
           </div>
 
           {cant > 0 && (
@@ -538,7 +693,9 @@ function Productos({ onVolver }) {
                 <span className="font-medium text-green-600">+ {cant}</span>
               </div>
               <div className="flex justify-between text-base border-t border-purple-200 pt-2 mt-2">
-                <span className="font-semibold text-purple-800">Nuevo stock</span>
+                <span className="font-semibold text-purple-800">
+                  Nuevo stock
+                </span>
                 <span className="font-bold text-purple-800">{nuevoStock}</span>
               </div>
             </div>
@@ -555,7 +712,6 @@ function Productos({ onVolver }) {
     )
   }
 
-  // Vista: FORMULARIO de producto
   if (vista === 'formulario') {
     const esEdicion = editandoId !== null
     return (
@@ -685,7 +841,6 @@ function Productos({ onVolver }) {
     )
   }
 
-  // Vista: LISTA
   return (
     <div className="min-h-screen bg-gray-100 p-4 pb-24">
       <button onClick={onVolver} className="text-blue-600 font-medium mb-4">
@@ -1026,9 +1181,6 @@ function Fiado({ onVolver, tienda }) {
               className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
               placeholder="Ej: 0991234567"
             />
-            <p className="text-xs text-gray-400 mt-1">
-              Si lo pones, podrás recordarle por WhatsApp con un toque.
-            </p>
           </div>
 
           <div>
@@ -1062,6 +1214,56 @@ function Fiado({ onVolver, tienda }) {
     const ultimoRecordatorio = recordatorios[recordatorios.length - 1]
     const dias = diasUltimoMovimiento(seleccionado)
     const color = colorAntiguedad(dias)
+
+    // ESTADÍSTICAS DEL CLIENTE
+    const fiadosDelCliente = fiados.filter(
+      f =>
+        f.nombre.toLowerCase().trim() ===
+        seleccionado.nombre.toLowerCase().trim()
+    )
+    const totalHistorico = fiadosDelCliente.reduce(
+      (s, f) => s + f.monto,
+      0
+    )
+    const totalPagadoHistorico = fiadosDelCliente.reduce(
+      (s, f) => s + f.abonos.reduce((sa, a) => sa + a.monto, 0),
+      0
+    )
+    const vecesFiado = fiadosDelCliente.length
+
+    // Días promedio de pago (solo para fiados ya pagados)
+    const fiadosPagados = fiadosDelCliente.filter(f => {
+      const pagado = f.abonos.reduce((s, a) => s + a.monto, 0)
+      return pagado >= f.monto
+    })
+
+    let promedioDiasPago = null
+    if (fiadosPagados.length > 0) {
+      const totalDias = fiadosPagados.reduce((s, f) => {
+        const ultimoAbono = f.abonos[f.abonos.length - 1]
+        if (!ultimoAbono) return s
+        const dias = Math.floor(
+          (new Date(ultimoAbono.fecha).getTime() -
+            new Date(f.fecha).getTime()) /
+            (1000 * 60 * 60 * 24)
+        )
+        return s + dias
+      }, 0)
+      promedioDiasPago = Math.round(totalDias / fiadosPagados.length)
+    }
+
+    // Cliente desde
+    const fechaMasAntigua = fiadosDelCliente.reduce((min, f) => {
+      const d = new Date(f.fecha).getTime()
+      return d < min ? d : min
+    }, Date.now())
+    const clienteDesde = new Date(fechaMasAntigua).toISOString()
+
+    // Buena paga
+    const porcentajePagado =
+      totalHistorico > 0
+        ? (totalPagadoHistorico / totalHistorico) * 100
+        : 0
 
     return (
       <div className="min-h-screen bg-gray-100 p-4">
@@ -1111,6 +1313,57 @@ function Fiado({ onVolver, tienda }) {
             <span>📱</span>
             <span>Recordar por WhatsApp</span>
           </button>
+        )}
+
+        {/* TARJETA DE ESTADÍSTICAS */}
+        {vecesFiado > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+            <p className="text-xs text-blue-700 font-medium mb-3">
+              📊 Historial del cliente
+            </p>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Cliente desde</span>
+                <span className="font-medium">{formatearFecha(clienteDesde)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Veces que le has fiado</span>
+                <span className="font-medium">{vecesFiado}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total fiado histórico</span>
+                <span className="font-medium">$ {totalHistorico.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total pagado</span>
+                <span className="font-medium text-green-600">
+                  $ {totalPagadoHistorico.toFixed(2)}
+                </span>
+              </div>
+              {promedioDiasPago !== null && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Paga en promedio</span>
+                  <span className="font-medium">
+                    {promedioDiasPago} {promedioDiasPago === 1 ? 'día' : 'días'}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-blue-200 pt-2 mt-2">
+                <span className="font-semibold text-blue-800">
+                  {porcentajePagado >= 90
+                    ? '⭐ Excelente pagador'
+                    : porcentajePagado >= 70
+                    ? '👍 Buen pagador'
+                    : porcentajePagado >= 50
+                    ? '⚠️ Pago irregular'
+                    : '🚨 Mal pagador'}
+                </span>
+                <span className="font-bold text-blue-800">
+                  {porcentajePagado.toFixed(0)}% pagado
+                </span>
+              </div>
+            </div>
+          </div>
         )}
 
         {ultimoRecordatorio && (
@@ -1594,7 +1847,7 @@ function Merma({ onVolver }) {
 }
 
 // ---------- PANTALLA: CERRAR DÍA ----------
-function CerrarDia({ onVolver }) {
+function CerrarDia({ onVolver, tienda }) {
   const [fiados] = useLocalStorage('fiados', [])
   const [cierres, setCierres] = useLocalStorage('cierres', [])
 
@@ -1621,6 +1874,7 @@ function CerrarDia({ onVolver }) {
     cierreHoy ? String(cierreHoy.efectivoInicial) : '0'
   )
   const [retiro, setRetiro] = useState(cierreHoy ? String(cierreHoy.retiro) : '0')
+  const [mostrarResumen, setMostrarResumen] = useState(false)
 
   const MARGEN = 0.25
 
@@ -1664,7 +1918,28 @@ function CerrarDia({ onVolver }) {
       setCierres([nuevo, ...cierres])
     }
 
-    onVolver()
+    setMostrarResumen(true)
+  }
+
+  function enviarResumenWhatsApp() {
+    const r = calcular()
+    const fecha = new Date().toLocaleDateString('es-EC', {
+      day: 'numeric',
+      month: 'long',
+    })
+
+    const mensaje = `📊 *Resumen del día — ${
+      tienda?.nombreTienda || 'Mi tienda'
+    }*\n📅 ${fecha}\n\n💰 Ventas: $${r.ventasTotales.toFixed(2)}\n📈 Ganancia estimada: $${r.gananciaEstimada.toFixed(
+      2
+    )}\n\n💳 Fiado prestado: $${fiadoDadoHoy.toFixed(
+      2
+    )}\n✅ Fiado cobrado: $${fiadoCobradoHoy.toFixed(
+      2
+    )}\n\n_Del programa Aliado — nunca más solo en tu negocio_`
+
+    const url = `https://wa.me/?text=${encodeURIComponent(mensaje)}`
+    window.open(url, '_blank')
   }
 
   const r = calcular()
@@ -1683,124 +1958,189 @@ function CerrarDia({ onVolver }) {
         })}
       </p>
 
-      <form onSubmit={guardar} className="space-y-4 mb-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            1. ¿Cuánto efectivo hay en la caja?
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            value={efectivoFinal}
-            onChange={(e) => setEfectivoFinal(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white text-lg"
-            placeholder="0.00"
-            autoFocus
-          />
-        </div>
-
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            2. ¿Cuánto había al abrir?
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            value={efectivoInicial}
-            onChange={(e) => setEfectivoInicial(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white text-lg"
-            placeholder="0.00"
-          />
-        </div>
-
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            3. ¿Retiraste para casa? (opcional)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            value={retiro}
-            onChange={(e) => setRetiro(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white text-lg"
-            placeholder="0.00"
-          />
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <p className="text-xs text-blue-700 font-medium mb-3">
-            Cálculo automático
-          </p>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Fiado prestado hoy</span>
-              <span className="font-medium">$ {fiadoDadoHoy.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Fiado cobrado hoy</span>
-              <span className="font-medium">$ {fiadoCobradoHoy.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between border-t border-blue-200 pt-2">
-              <span className="text-gray-600">Fiado neto del día</span>
-              <span className="font-medium text-orange-600">
-                $ {(fiadoDadoHoy - fiadoCobradoHoy).toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Ventas en efectivo</span>
-              <span className="font-medium">
-                $ {r.ventasEfectivo.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between text-base border-t border-blue-200 pt-2">
-              <span className="font-semibold text-blue-800">Ventas totales</span>
-              <span className="font-bold text-blue-800">
-                $ {r.ventasTotales.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Ganancia estimada (25%)</span>
-              <span className="font-medium text-green-600">
-                $ {r.gananciaEstimada.toFixed(2)}
-              </span>
-            </div>
+      {mostrarResumen ? (
+        <div className="space-y-4">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+            <p className="text-3xl mb-2">✅</p>
+            <p className="text-lg font-bold text-green-800">Día cerrado</p>
+            <p className="text-xs text-green-600 mt-1">
+              Puedes enviar el resumen a tu WhatsApp
+            </p>
           </div>
-        </div>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white rounded-xl py-4 font-medium shadow-sm active:bg-blue-700"
-        >
-          {cierreHoy ? 'Actualizar cierre' : 'Guardar cierre del día'}
-        </button>
-      </form>
-
-      {cierres.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-sm font-medium text-gray-700 mb-3">
-            Últimos cierres
-          </h2>
-          <div className="space-y-2">
-            {cierres.slice(0, 5).map(c => (
-              <div
-                key={c.id}
-                className="bg-white rounded-xl p-3 shadow-sm flex justify-between items-center"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-800">
-                    {formatearFecha(c.fecha)}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Ganancia: ${c.gananciaEstimada.toFixed(2)}
-                  </p>
-                </div>
-                <p className="font-bold text-gray-800">
-                  $ {c.ventasTotales.toFixed(2)}
-                </p>
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <p className="text-xs text-gray-500 mb-3">Resumen del día</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Ventas totales</span>
+                <span className="font-bold text-green-600">
+                  $ {r.ventasTotales.toFixed(2)}
+                </span>
               </div>
-            ))}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Ganancia estimada</span>
+                <span className="font-medium">
+                  $ {r.gananciaEstimada.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Fiado prestado</span>
+                <span className="font-medium text-red-600">
+                  $ {fiadoDadoHoy.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Fiado cobrado</span>
+                <span className="font-medium text-green-600">
+                  $ {fiadoCobradoHoy.toFixed(2)}
+                </span>
+              </div>
+            </div>
           </div>
+
+          <button
+            onClick={enviarResumenWhatsApp}
+            className="w-full bg-green-500 text-white rounded-xl py-4 font-medium shadow-sm active:bg-green-600 flex items-center justify-center gap-2"
+          >
+            <span>📱</span>
+            <span>Enviar resumen por WhatsApp</span>
+          </button>
+
+          <button
+            onClick={onVolver}
+            className="w-full bg-gray-200 text-gray-700 rounded-xl py-3 font-medium text-sm"
+          >
+            Volver al inicio
+          </button>
         </div>
+      ) : (
+        <>
+          <form onSubmit={guardar} className="space-y-4 mb-4">
+            <div className="bg-white rounded-xl p-4 shadow-sm">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                1. ¿Cuánto efectivo hay en la caja?
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={efectivoFinal}
+                onChange={(e) => setEfectivoFinal(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white text-lg"
+                placeholder="0.00"
+                autoFocus
+              />
+            </div>
+
+            <div className="bg-white rounded-xl p-4 shadow-sm">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                2. ¿Cuánto había al abrir?
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={efectivoInicial}
+                onChange={(e) => setEfectivoInicial(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white text-lg"
+                placeholder="0.00"
+              />
+            </div>
+
+            <div className="bg-white rounded-xl p-4 shadow-sm">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                3. ¿Retiraste para casa? (opcional)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={retiro}
+                onChange={(e) => setRetiro(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white text-lg"
+                placeholder="0.00"
+              />
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p className="text-xs text-blue-700 font-medium mb-3">
+                Cálculo automático
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Fiado prestado hoy</span>
+                  <span className="font-medium">
+                    $ {fiadoDadoHoy.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Fiado cobrado hoy</span>
+                  <span className="font-medium">
+                    $ {fiadoCobradoHoy.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-blue-200 pt-2">
+                  <span className="text-gray-600">Fiado neto del día</span>
+                  <span className="font-medium text-orange-600">
+                    $ {(fiadoDadoHoy - fiadoCobradoHoy).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ventas en efectivo</span>
+                  <span className="font-medium">
+                    $ {r.ventasEfectivo.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-base border-t border-blue-200 pt-2">
+                  <span className="font-semibold text-blue-800">
+                    Ventas totales
+                  </span>
+                  <span className="font-bold text-blue-800">
+                    $ {r.ventasTotales.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Ganancia estimada (25%)</span>
+                  <span className="font-medium text-green-600">
+                    $ {r.gananciaEstimada.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white rounded-xl py-4 font-medium shadow-sm active:bg-blue-700"
+            >
+              {cierreHoy ? 'Actualizar cierre' : 'Guardar cierre del día'}
+            </button>
+          </form>
+
+          {cierres.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-sm font-medium text-gray-700 mb-3">
+                Últimos cierres
+              </h2>
+              <div className="space-y-2">
+                {cierres.slice(0, 5).map(c => (
+                  <div
+                    key={c.id}
+                    className="bg-white rounded-xl p-3 shadow-sm flex justify-between items-center"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">
+                        {formatearFecha(c.fecha)}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Ganancia: ${c.gananciaEstimada.toFixed(2)}
+                      </p>
+                    </div>
+                    <p className="font-bold text-gray-800">
+                      $ {c.ventasTotales.toFixed(2)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -1818,6 +2158,7 @@ function App() {
   if (pantalla === 'config') {
     return (
       <Configuracion
+        modoEdicion={true}
         onGuardar={(datos) => {
           setTienda(datos)
           setPantalla('inicio')
@@ -1833,7 +2174,12 @@ function App() {
     return <Merma onVolver={() => setPantalla('inicio')} />
   }
   if (pantalla === 'cerrarDia') {
-    return <CerrarDia onVolver={() => setPantalla('inicio')} />
+    return (
+      <CerrarDia
+        onVolver={() => setPantalla('inicio')}
+        tienda={tienda}
+      />
+    )
   }
   if (pantalla === 'productos') {
     return <Productos onVolver={() => setPantalla('inicio')} />

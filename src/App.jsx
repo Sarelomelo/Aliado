@@ -15,6 +15,53 @@ function esHoy(iso) {
   return d.toDateString() === hoy.toDateString()
 }
 
+// Calcula cuántos días han pasado desde una fecha
+function diasDesde(iso) {
+  const d = new Date(iso)
+  const hoy = new Date()
+  d.setHours(0, 0, 0, 0)
+  hoy.setHours(0, 0, 0, 0)
+  const diff = hoy.getTime() - d.getTime()
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
+}
+
+// Devuelve el color según los días de antigüedad
+function colorAntiguedad(dias) {
+  if (dias < 7) {
+    return {
+      bg: 'bg-green-50',
+      texto: 'text-green-700',
+      punto: 'border-green-500',
+    }
+  }
+  if (dias < 15) {
+    return {
+      bg: 'bg-yellow-50',
+      texto: 'text-yellow-700',
+      punto: 'border-yellow-500',
+    }
+  }
+  if (dias < 30) {
+    return {
+      bg: 'bg-orange-50',
+      texto: 'text-orange-700',
+      punto: 'border-orange-500',
+    }
+  }
+  return {
+    bg: 'bg-red-50',
+    texto: 'text-red-700',
+    punto: 'border-red-500',
+  }
+}
+
+// Texto amigable para los días
+function textoDias(dias) {
+  if (dias === 0) return 'hoy'
+  if (dias === 1) return 'hace 1 día'
+  return `hace ${dias} días`
+}
+
 function useLocalStorage(clave, valorInicial) {
   const [valor, setValor] = useState(() => {
     try {
@@ -148,6 +195,17 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onConfig }) {
   const totalMerma = mermas.reduce((s, m) => s + m.valor, 0)
   const cierreHoy = cierres.find(c => esHoy(c.fecha))
 
+  const clientesVencidos = fiados.filter(f => {
+    const pagado = f.abonos.reduce((a, ab) => a + ab.monto, 0)
+    const deuda = f.monto - pagado
+    if (deuda <= 0) return false
+    const ultimoMovimiento =
+      f.abonos.length > 0
+        ? f.abonos[f.abonos.length - 1].fecha
+        : f.fecha
+    return diasDesde(ultimoMovimiento) >= 15
+  }).length
+
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="mb-6 flex justify-between items-start">
@@ -179,6 +237,11 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onConfig }) {
             $ {totalFiado.toFixed(2)}
           </p>
           <p className="text-xs text-gray-400">{fiados.length} clientes</p>
+          {clientesVencidos > 0 && (
+            <p className="text-xs text-orange-600 font-medium mt-1">
+              ⚠️ {clientesVencidos} con deuda vencida
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-xl p-4 shadow-sm">
@@ -243,16 +306,13 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onConfig }) {
 // ---------- PANTALLA: FIADO ----------
 function Fiado({ onVolver, tienda }) {
   const [fiados, setFiados] = useLocalStorage('fiados', [])
-  const [vista, setVista] = useState('lista') // 'lista' | 'nuevo' | 'detalle' | 'editar'
+  const [vista, setVista] = useState('lista')
   const [seleccionadoId, setSeleccionadoId] = useState(null)
   const [abonoEditandoIdx, setAbonoEditandoIdx] = useState(null)
 
-  // Formulario
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [monto, setMonto] = useState('')
-
-  // Abono
   const [montoAbono, setMontoAbono] = useState('')
 
   function calcularDeuda(fiado) {
@@ -260,8 +320,24 @@ function Fiado({ onVolver, tienda }) {
     return fiado.monto - pagado
   }
 
+  function diasUltimoMovimiento(fiado) {
+    const ultimoMovimiento =
+      fiado.abonos.length > 0
+        ? fiado.abonos[fiado.abonos.length - 1].fecha
+        : fiado.fecha
+    return diasDesde(ultimoMovimiento)
+  }
+
   const totalPendiente = fiados.reduce((s, f) => s + calcularDeuda(f), 0)
   const seleccionado = fiados.find(f => f.id === seleccionadoId)
+
+  const fiadosOrdenados = [...fiados].sort((a, b) => {
+    const deudaA = calcularDeuda(a)
+    const deudaB = calcularDeuda(b)
+    if (deudaA <= 0 && deudaB > 0) return 1
+    if (deudaB <= 0 && deudaA > 0) return -1
+    return diasUltimoMovimiento(b) - diasUltimoMovimiento(a)
+  })
 
   function abrirNuevo() {
     setNombre('')
@@ -480,6 +556,8 @@ function Fiado({ onVolver, tienda }) {
     const deuda = calcularDeuda(seleccionado)
     const recordatorios = seleccionado.recordatorios || []
     const ultimoRecordatorio = recordatorios[recordatorios.length - 1]
+    const dias = diasUltimoMovimiento(seleccionado)
+    const color = colorAntiguedad(dias)
 
     return (
       <div className="min-h-screen bg-gray-100 p-4">
@@ -509,9 +587,17 @@ function Fiado({ onVolver, tienda }) {
             📱 {seleccionado.telefono}
           </p>
         )}
-        <p className="text-3xl font-bold text-red-600 mb-6">
+        <p className="text-3xl font-bold text-red-600 mb-2">
           $ {deuda.toFixed(2)}
         </p>
+
+        {deuda > 0 && (
+          <div
+            className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 ${color.bg} ${color.texto}`}
+          >
+            Último movimiento: {textoDias(dias)}
+          </div>
+        )}
 
         {deuda > 0 && (
           <button
@@ -653,8 +739,11 @@ function Fiado({ onVolver, tienda }) {
         ← Volver
       </button>
       <h1 className="text-2xl font-bold text-gray-800 mb-1">Fiado</h1>
-      <p className="text-3xl font-bold text-red-600 mb-6">
+      <p className="text-3xl font-bold text-red-600 mb-2">
         $ {totalPendiente.toFixed(2)}
+      </p>
+      <p className="text-xs text-gray-500 mb-6">
+        Ordenado por antigüedad (más viejo primero)
       </p>
 
       {fiados.length === 0 ? (
@@ -666,8 +755,10 @@ function Fiado({ onVolver, tienda }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {fiados.map(f => {
+          {fiadosOrdenados.map(f => {
             const deuda = calcularDeuda(f)
+            const dias = diasUltimoMovimiento(f)
+            const color = colorAntiguedad(dias)
             return (
               <button
                 key={f.id}
@@ -675,15 +766,26 @@ function Fiado({ onVolver, tienda }) {
                   setSeleccionadoId(f.id)
                   setVista('detalle')
                 }}
-                className="w-full text-left bg-white rounded-xl p-4 shadow-sm active:bg-gray-50"
+                className={`w-full text-left bg-white rounded-xl p-4 shadow-sm active:bg-gray-50 border-l-4 ${
+                  deuda > 0 ? color.punto : 'border-transparent'
+                }`}
               >
                 <div className="flex justify-between items-center">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium text-gray-800">{f.nombre}</p>
-                    <p className="text-xs text-gray-400">
-                      {formatearFecha(f.fecha)}
-                      {f.telefono && ' · 📱'}
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <p className="text-xs text-gray-400">
+                        {formatearFecha(f.fecha)}
+                        {f.telefono && ' · 📱'}
+                      </p>
+                      {deuda > 0 && (
+                        <span
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full ${color.bg} ${color.texto}`}
+                        >
+                          {textoDias(dias)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p
                     className={`font-bold ${

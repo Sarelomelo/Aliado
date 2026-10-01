@@ -1,9 +1,13 @@
-import { descargar } from "./descargar.js";
-
 export async function compartirRespaldo(nombre, datos) {
-  const archivo = new File([JSON.stringify(datos, null, 2)], nombre, {
-    type: "application/json",
-  });
+  // .txt es un documento compartible en más navegadores que .json.
+  // El contenido sigue siendo el respaldo JSON completo y validado al importar.
+  const archivo = new File(
+    [JSON.stringify(datos, null, 2)],
+    nombre.replace(/\.json$/, ".txt"),
+    {
+      type: "text/plain",
+    },
+  );
   if (navigator.share && navigator.canShare?.({ files: [archivo] })) {
     try {
       await navigator.share({
@@ -14,9 +18,8 @@ export async function compartirRespaldo(nombre, datos) {
     } catch (error) {
       if (error.name === "AbortError")
         return "No se compartió el respaldo. Puedes intentarlo cuando quieras.";
-      // Si el sistema no puede compartir JSON, ofrecer el archivo completo.
+      return "No pudimos abrir las opciones para compartir. Intenta abrir Aliado en Chrome o Safari desde tu teléfono y vuelve a pulsar el botón. No se descargó ni envió ningún respaldo.";
     }
   }
-  descargar(nombre, datos);
-  return "Iniciamos la descarga del respaldo. Abre WhatsApp, elige tu chat personal u otro chat y adjunta el archivo .json como documento.";
+  return "Este navegador no permite compartir archivos. Abre Aliado en Chrome o Safari desde tu teléfono y vuelve a intentarlo. La descarga sigue disponible en Descargar respaldo completo.";
 }

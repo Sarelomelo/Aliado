@@ -479,7 +479,8 @@ test("respaldo se comparte como archivo completo; cancelar no anuncia entrega", 
   await page.evaluate(() => {
     Object.defineProperty(navigator, "canShare", {
       configurable: true,
-      value: () => true,
+      value: ({ files }) =>
+        files[0].type === "text/plain" && files[0].name.endsWith(".txt"),
     });
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -489,7 +490,7 @@ test("respaldo se comparte como archivo completo; cancelar no anuncia entrega", 
     });
   });
   await page
-    .getByRole("button", { name: "Compartir respaldo", exact: true })
+    .getByRole("button", { name: "Hacer respaldo en WhatsApp", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText(
     "no puede confirmar su entrega",
@@ -505,12 +506,12 @@ test("respaldo se comparte como archivo completo; cancelar no anuncia entrega", 
     }),
   );
   await page
-    .getByRole("button", { name: "Compartir respaldo", exact: true })
+    .getByRole("button", { name: "Hacer respaldo en WhatsApp", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("No se compartió");
 });
 
-test("si compartir archivos no está disponible se descarga respaldo restaurable", async ({
+test("si no hay soporte para compartir, no descarga automáticamente", async ({
   page,
 }) => {
   await configurar(page);
@@ -521,14 +522,51 @@ test("si compartir archivos no está disponible se descarga respaldo restaurable
       value: () => false,
     }),
   );
-  const descarga = page.waitForEvent("download");
+  let descargas = 0;
+  page.on("download", () => descargas++);
   await page
-    .getByRole("button", { name: "Compartir respaldo", exact: true })
+    .getByRole("button", { name: "Hacer respaldo en WhatsApp", exact: true })
     .click();
-  expect((await descarga).suggestedFilename()).toMatch(
-    /aliado-respaldo-.*\.json/,
-  );
   await expect(page.getByRole("status")).toContainText(
-    "adjunta el archivo .json como documento",
+    "Este navegador no permite compartir archivos",
   );
+  expect(descargas).toBe(0);
+});
+
+test("restaurar el documento txt compartido conserva todos los datos", async ({
+  page,
+}) => {
+  await configurar(page);
+  await producto(page);
+  const antes = await datos(page);
+  await ir(page, "Configuración");
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async ({ files }) => {
+        window.documentoRespaldo = await files[0].text();
+      },
+    });
+  });
+  await page
+    .getByRole("button", { name: "Hacer respaldo en WhatsApp", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "no puede confirmar su entrega",
+  );
+  const texto = await page.evaluate(() => window.documentoRespaldo);
+  page.on("dialog", (dialog) => dialog.accept());
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles({
+      name: "respaldo-whatsapp.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from(texto),
+    });
+  await expect(page.getByRole("status")).toContainText("Respaldo restaurado");
+  expect(await datos(page)).toEqual(antes);
 });

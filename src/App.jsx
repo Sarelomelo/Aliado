@@ -32,7 +32,7 @@ function ImportarInicial({ restaurar }) {
       <Campo label="Restaura los datos de tu tienda">
         <input
           type="file"
-          accept=".json,application/json"
+          accept=".json,.txt,application/json,text/plain"
           onChange={async (e) => {
             const f = e.target.files[0];
             e.target.value = "";
@@ -54,8 +54,8 @@ function ImportarInicial({ restaurar }) {
         <p>Si ya usabas Aliado, recupera tu información con un respaldo:</p>
         <ol>
           <li>
-            Busca el archivo de respaldo de Aliado (.json) que guardaste en tu
-            celular o computadora.
+            Busca el archivo de respaldo de Aliado (.json o .txt) que guardaste
+            en tu celular o computadora.
           </li>
           <li>Pulsa «Seleccionar archivo» y elige ese respaldo.</li>
           <li>

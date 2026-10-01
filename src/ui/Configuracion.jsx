@@ -70,7 +70,7 @@ export default function Configuracion({
               }
             }}
           >
-            Compartir respaldo
+            Hacer respaldo en WhatsApp
           </Boton>
           <Boton
             secundario
@@ -110,16 +110,17 @@ export default function Configuracion({
           )}
         </div>
         <p className="nota">
-          Elige WhatsApp en las opciones de compartir y envía el archivo a tu
-          chat personal o a alguien de confianza. Puedes recuperarlo después
-          descargándolo y usando Restaurar respaldo. Comparte el archivo solo
-          con quien quieras que tenga acceso a los datos de tu tienda.
+          Pulsa el botón, elige WhatsApp y selecciona el chat donde quieras
+          guardar tu respaldo. El respaldo es un archivo .txt con todos los
+          datos de tu tienda. Para recuperarlos, descarga ese archivo desde el
+          chat y selecciónalo en Restaurar respaldo. Compártelo solo con alguien
+          de confianza.
         </p>
         {avisoRespaldo && <p role="status">{avisoRespaldo}</p>}
         <input
           ref={archivo}
           type="file"
-          accept=".json,application/json"
+          accept=".json,.txt,application/json,text/plain"
           onChange={importar}
           hidden
         />

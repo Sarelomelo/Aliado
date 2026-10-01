@@ -236,17 +236,16 @@ export default function Reportes({ estado: s, actuar, ocupado }) {
           .slice()
           .reverse()
           .map((m) => (
-            <div className="fila" key={m.id}>
-              <div>
-                <strong>{m.nombre}</strong>
-                <p>
-                  {cantidadTexto(m.cantidadQ)} {m.unidad} · {m.motivo}
-                  {m.historica ? " · registro histórico, valor estimado" : ""}
-                </p>
+            <div className="item" key={m.id}>
+              <div className="titulo-fila">
+                <strong>Merma · {dinero(m.costoCents)}</strong>
                 <Fecha valor={m.fecha} />
               </div>
+              <p>
+                {m.nombre}: {cantidadTexto(m.cantidadQ)} {m.unidad} · {m.motivo}
+                {m.historica ? " · registro histórico, valor estimado" : ""}
+              </p>
               <div>
-                <strong>{dinero(m.costoCents)}</strong>
                 {m.productoId &&
                   !m.historica &&
                   !m.anuladaPor &&

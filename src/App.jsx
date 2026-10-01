@@ -20,33 +20,54 @@ import {
   leerOriginales,
 } from "./almacen.js";
 import { crearSimulacion } from "./simulacion.js";
+import Icono from "./ui/Icono.jsx";
+import { marcasInstitucionales } from "./identidad.js";
 import "./App.css";
 
 const fechaAhora = () => new Date().toISOString();
 
 function ImportarInicial({ restaurar }) {
   return (
-    <Campo label="Restaurar un respaldo existente">
-      <input
-        type="file"
-        accept=".json,application/json"
-        onChange={async (e) => {
-          const f = e.target.files[0];
-          e.target.value = "";
-          if (!f) return;
-          if (f.size > 20 * 1024 * 1024)
-            throw new Error("El respaldo supera 20 MB.");
-          const datos = JSON.parse(await f.text());
-          prepararRespaldo(datos);
-          if (
-            confirm(
-              "¿Restaurar este respaldo? Conserva primero una copia de los datos originales si hubo un error.",
+    <div className="restauracion-inicial">
+      <Campo label="Restaura los datos de tu tienda">
+        <input
+          type="file"
+          accept=".json,application/json"
+          onChange={async (e) => {
+            const f = e.target.files[0];
+            e.target.value = "";
+            if (!f) return;
+            if (f.size > 20 * 1024 * 1024)
+              throw new Error("El respaldo supera 20 MB.");
+            const datos = JSON.parse(await f.text());
+            prepararRespaldo(datos);
+            if (
+              confirm(
+                "¿Restaurar este respaldo? Conserva primero una copia de los datos originales si hubo un error.",
+              )
             )
-          )
-            await restaurar(datos);
-        }}
-      />
-    </Campo>
+              await restaurar(datos);
+          }}
+        />
+      </Campo>
+      <div className="ayuda-restauracion">
+        <p>Si ya usabas Aliado, recupera tu información con un respaldo:</p>
+        <ol>
+          <li>
+            Busca el archivo de respaldo de Aliado (.json) que guardaste en tu
+            celular o computadora.
+          </li>
+          <li>Pulsa «Seleccionar archivo» y elige ese respaldo.</li>
+          <li>
+            Confirma la restauración para recuperar los datos de tu tienda.
+          </li>
+        </ol>
+        <p>
+          ¿Aún no tienes un respaldo? Crea tu tienda. Luego podrás guardar uno
+          desde Configuración.
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -204,12 +225,25 @@ export default function App() {
   ];
   return (
     <div className="app">
-      <header>
+      <header className="cabecera">
+        {marcasInstitucionales.length > 0 && (
+          <div
+            className="marcas-institucionales"
+            aria-label="Apoyo institucional"
+          >
+            {marcasInstitucionales.map((marca) => (
+              <img key={marca.src} src={marca.src} alt={marca.alt} />
+            ))}
+          </div>
+        )}
         <div className="marca">
           <img src="/icon-192.png" alt="" />
           <div>
-            <h1>Aliado</h1>
-            <p>{s?.tienda?.nombreTienda || "Control de tu negocio"}</p>
+            <h1>Aliado Valencia</h1>
+            <p>Control total de tu negocio</p>
+            {s?.tienda && (
+              <span className="nombre-tienda">{s.tienda.nombreTienda}</span>
+            )}
           </div>
         </div>
         {!practica && (
@@ -275,7 +309,7 @@ export default function App() {
         </section>
       ) : !s.tienda ? (
         <section>
-          <h2>Configura tu tienda</h2>
+          <h2>Crea tu tienda</h2>
           <FormTienda tienda={null} actuar={actuar} ocupado={ocupado} />
           <ImportarInicial restaurar={restaurar} />
           <p>
@@ -285,10 +319,11 @@ export default function App() {
         </section>
       ) : (
         <>
-          <nav aria-label="Secciones">
+          <nav className="navegacion-tarjetas" aria-label="Secciones">
             {nav.map(([id, nombre]) => (
               <button
                 key={id}
+                aria-label={nombre}
                 className={pantalla === id ? "activo" : ""}
                 onClick={() => {
                   setPantalla(id);
@@ -297,7 +332,10 @@ export default function App() {
                 }}
                 aria-current={pantalla === id ? "page" : undefined}
               >
-                {nombre}
+                <span className="icono-seccion">
+                  <Icono nombre={id} />
+                </span>
+                <span>{nombre}</span>
               </button>
             ))}
           </nav>

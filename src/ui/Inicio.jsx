@@ -24,15 +24,6 @@ export default function Inicio({ estado: s, navegar }) {
     );
   return (
     <>
-      <div className="acciones">
-        <Boton onClick={() => navegar("vender")}>Nueva venta</Boton>
-        <Boton secundario onClick={() => navegar("inventario")}>
-          Ver inventario
-        </Boton>
-        <Boton secundario onClick={() => navegar("caja")}>
-          Caja y gastos
-        </Boton>
-      </div>
       <div className="indicadores">
         <Tarjeta
           label="Ventas registradas hoy"

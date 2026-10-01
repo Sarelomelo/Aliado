@@ -89,27 +89,125 @@ header {
 .marca p {
   margin: 0;
 }
-nav {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  background: #fff;
-  border: 1px solid #d8e2ee;
-  padding: 0.5rem;
-  border-radius: 12px;
-  margin: 1rem 0 1.5rem;
+/* Un único menú visual para todas las funciones. */
+.navegacion-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 1.25rem 0 1.5rem;
 }
-nav button {
-  border: 0;
-  background: transparent;
-  padding: 0.8rem 1rem;
-  border-radius: 8px;
-  color: #31465e;
+.navegacion-tarjetas button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  min-width: 0;
+  min-height: 112px;
+  padding: 1rem 0.4rem;
+  border: 1px solid #c9d8ec;
+  border-radius: 15px;
+  background: #fff;
+  color: #244470;
+  font-size: 0.95rem;
+  font-weight: 650;
+  box-shadow: 0 3px 9px #163e7010;
+  transition:
+    background 120ms,
+    border-color 120ms;
+  overflow-wrap: anywhere;
+}
+.navegacion-tarjetas button:hover {
+  background: #edf4ff;
+  border-color: #6f99e5;
+}
+.navegacion-tarjetas button.activo {
+  background: #1d4ed8;
+  color: #fff;
+  border-color: #1d4ed8;
+  box-shadow: 0 5px 12px #1d4ed826;
+}
+.icono-seccion {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #edf3ff;
+  color: #1d4ed8;
+}
+.icono-seccion svg {
+  width: 27px;
+  height: 27px;
+}
+.activo .icono-seccion {
+  background: #ffffff26;
+  color: #fff;
+}
+.cabecera {
+  padding: 1.1rem;
+  border: 1px solid #d8e2ee;
+  border-radius: 17px;
+  background: linear-gradient(110deg, #fff, #edf4ff);
+  flex-wrap: wrap;
+}
+.marca {
+  min-width: 0;
+}
+.marca > div {
+  min-width: 0;
+}
+.marca h1 {
+  color: #183d7a;
+}
+.marca p {
+  font-size: 0.95rem;
+}
+.nombre-tienda {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  margin-top: 0.4rem;
+  color: #244470;
+  font-size: 0.875rem;
   font-weight: 600;
 }
-nav button.activo {
-  background: #1d4ed8;
-  color: white;
+.marcas-institucionales {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 100%;
+}
+.marcas-institucionales img {
+  max-width: 160px;
+  width: auto;
+  height: 48px;
+  object-fit: contain;
+}
+.restauracion-inicial {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #d8e2ee;
+  border-radius: 12px;
+  background: #f6f9ff;
+}
+.ayuda-restauracion {
+  font-size: 0.875rem;
+  color: #40546b;
+  line-height: 1.55;
+}
+.ayuda-restauracion ol {
+  padding-left: 1.25rem;
+  margin: 0.6rem 0;
+}
+.ayuda-restauracion li + li {
+  margin-top: 0.4rem;
+}
+@media (max-width: 950px) {
+  .navegacion-tarjetas {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 .boton {
   border: 1px solid #1d4ed8;
@@ -373,12 +471,32 @@ footer {
   header > .boton {
     font-size: 0.9rem;
   }
-  nav {
-    gap: 0.1rem;
+  .navegacion-tarjetas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem;
   }
-  nav button {
-    padding: 0.7rem 0.6rem;
-    font-size: 0.9rem;
+  .navegacion-tarjetas button {
+    min-height: 104px;
+    padding: 0.8rem 0.3rem;
+    font-size: 0.875rem;
+  }
+  .navegacion-tarjetas button:last-child {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    min-height: 66px;
+    gap: 0.8rem;
+  }
+  .marca h1 {
+    font-size: 1.4rem;
+  }
+  .marca p {
+    font-size: 0.85rem;
+  }
+  .cabecera {
+    padding: 0.9rem;
+  }
+  .restauracion-inicial {
+    padding: 0.8rem;
   }
   .venta-layout,
   .dos-columnas {

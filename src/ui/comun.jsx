@@ -104,7 +104,7 @@ export function FormTienda({ tienda, actuar, ocupado }) {
       className="formulario"
     >
       <Campo
-        label="Nombre de la tienda"
+        label="Nombre de tu tienda"
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
         required
@@ -125,7 +125,7 @@ export function FormTienda({ tienda, actuar, ocupado }) {
         maxLength={30}
       />
       <Boton disabled={ocupado}>
-        {tienda ? "Guardar configuración" : "Configurar mi tienda"}
+        {tienda ? "Guardar configuración" : "Crear mi tienda"}
       </Boton>
     </Formulario>
   );

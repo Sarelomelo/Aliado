@@ -30,13 +30,13 @@ async function ir(page, nombre) {
 async function configurar(page) {
   await page.goto("/");
   await page
-    .getByLabel("Nombre de la tienda", { exact: true })
+    .getByLabel("Nombre de tu tienda", { exact: true })
     .fill("Tienda de prueba");
   await page
     .getByLabel("Nombre del propietario", { exact: true })
     .fill("Tendero ficticio");
   await page
-    .getByRole("button", { name: "Configurar mi tienda", exact: true })
+    .getByRole("button", { name: "Crear mi tienda", exact: true })
     .click();
   await expect(page.getByRole("navigation")).toBeVisible();
 }

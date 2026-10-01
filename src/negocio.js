@@ -137,6 +137,14 @@ export function aplicarOperacion(estado, op) {
     const q = entero(op.stockQ, "Stock");
     const precio = entero(op.precioCents, "Precio");
     const costo = entero(op.costoCents, "Costo");
+    const valorInicial =
+      op.valorInicialCents === undefined
+        ? importeCantidad(costo, q)
+        : entero(op.valorInicialCents, "Valor inicial");
+    exigir(
+      q > 0 || valorInicial === 0,
+      "Para registrar el costo de una compra, indica también la cantidad.",
+    );
     exigir(
       op.unidad !== "unidad" || q % 1000 === 0,
       "Stock por unidad debe ser entero.",
@@ -149,13 +157,13 @@ export function aplicarOperacion(estado, op) {
       costoReferenciaCents: costo,
       stockQ: q,
       minimoQ: entero(op.minimoQ, "Mínimo"),
-      valorCents: importeCantidad(costo, q),
+      valorCents: valorInicial,
       activo: true,
     });
     registrarMovimiento(s, op, "inventarioInicial", 0, 0, {
       productoId: op.id,
       deltaQ: q,
-      costoCents: importeCantidad(costo, q),
+      costoCents: valorInicial,
     });
   } else if (op.tipo === "editarProducto") {
     const p = producto(s, op.productoId);

@@ -1,5 +1,6 @@
 import { descargar } from "./descargar.js";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { compartirRespaldo } from "./compartirRespaldo.js";
 import { dinero } from "../negocio.js";
 import { diaEcuador } from "../datos.js";
 import {
@@ -19,6 +20,8 @@ export default function Configuracion({
   obtenerBase,
 }) {
   const archivo = useRef(null);
+  const [compartiendo, setCompartiendo] = useState(false);
+  const [avisoRespaldo, setAvisoRespaldo] = useState("");
   async function importar(e) {
     const f = e.target.files[0];
     e.target.value = "";
@@ -49,6 +52,26 @@ export default function Configuracion({
           periódicamente y antes de cambiar de equipo o dirección web.
         </p>
         <div className="acciones">
+          <Boton
+            secundario
+            disabled={ocupado || compartiendo}
+            onClick={async () => {
+              setCompartiendo(true);
+              setAvisoRespaldo("");
+              try {
+                setAvisoRespaldo(
+                  await compartirRespaldo(
+                    `aliado-respaldo-${diaEcuador()}.json`,
+                    exportarRespaldo(s),
+                  ),
+                );
+              } finally {
+                setCompartiendo(false);
+              }
+            }}
+          >
+            Compartir respaldo
+          </Boton>
           <Boton
             secundario
             onClick={() =>
@@ -86,6 +109,13 @@ export default function Configuracion({
             </Boton>
           )}
         </div>
+        <p className="nota">
+          Elige WhatsApp en las opciones de compartir y envía el archivo a tu
+          chat personal o a alguien de confianza. Puedes recuperarlo después
+          descargándolo y usando Restaurar respaldo. Comparte el archivo solo
+          con quien quieras que tenga acceso a los datos de tu tienda.
+        </p>
+        {avisoRespaldo && <p role="status">{avisoRespaldo}</p>}
         <input
           ref={archivo}
           type="file"

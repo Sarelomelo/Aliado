@@ -46,10 +46,16 @@ async function producto(page) {
     .getByRole("button", { name: "Nuevo producto", exact: true })
     .click();
   await page.getByLabel("Nombre del producto", { exact: true }).fill("Leche");
-  await page.getByLabel("Precio de venta por unidad de medida").fill("1");
-  await page.getByLabel("Stock mínimo", { exact: true }).fill("2");
-  await page.getByLabel("Stock inicial", { exact: true }).fill("3");
-  await page.getByLabel("Costo de compra por unidad de medida").fill("0.70");
+  await page.getByLabel("¿A cuánto vendes cada unidad?").fill("1");
+  await page
+    .getByLabel("¿Con qué cantidad quieres que te avisemos para reponer?", {
+      exact: true,
+    })
+    .fill("2");
+  await page
+    .getByLabel("¿Cuántos productos tienes ahora?", { exact: true })
+    .fill("3");
+  await page.getByLabel("¿Cuánto te costó cada unidad?").fill("0.70");
   await page
     .getByRole("button", { name: "Guardar movimiento", exact: true })
     .click();
@@ -85,7 +91,7 @@ test("tienda real local: venta, alerta, merma, reposición, cierre y respaldo", 
   ).toBeVisible();
   await ir(page, "Inventario");
   await page.getByRole("button", { name: "Merma", exact: true }).click();
-  await page.getByLabel("Cantidad (unidad)").fill("1");
+  await page.getByLabel("¿Cuánto producto se perdió? (unidad)").fill("1");
   await page
     .getByRole("button", { name: "Guardar movimiento", exact: true })
     .click();
@@ -93,8 +99,8 @@ test("tienda real local: venta, alerta, merma, reposición, cierre y respaldo", 
   expect(s.productos[0].stockQ).toBe(1000);
   expect(s.mermas[0].costoCents).toBe(70);
   await page.getByRole("button", { name: "Reponer", exact: true }).click();
-  await page.getByLabel("Cantidad (unidad)").fill("5");
-  await page.getByLabel("Costo TOTAL de la compra").fill("4");
+  await page.getByLabel("¿Cuánto vas a añadir? (unidad)").fill("5");
+  await page.getByLabel("¿Cuánto pagaste por toda la compra?").fill("4");
   await page
     .getByRole("button", { name: "Guardar movimiento", exact: true })
     .click();
@@ -408,4 +414,121 @@ test("datos corruptos quedan protegidos y se pueden exportar para recuperación"
     "aliado-recuperacion-originales.json",
   );
   expect((await datos(page)).productos[0].stockQ).toBe(-1000);
+});
+
+test("compra de arroz por sacos, venta por kg y reposición", async ({
+  page,
+}) => {
+  await configurar(page);
+  await ir(page, "Inventario");
+  await page
+    .getByRole("button", { name: "Nuevo producto", exact: true })
+    .click();
+  await page
+    .getByLabel("Nombre del producto", { exact: true })
+    .fill("Arroz por sacos");
+  await page.getByLabel("¿Cómo vendes este producto?").selectOption("kg");
+  await page.getByLabel("¿A cuánto vendes cada kilogramo?").fill("1");
+  await page
+    .getByLabel("¿Cómo quieres ingresar la cantidad?")
+    .selectOption("envases");
+  await page.getByLabel("¿Cuántos envases compraste?").fill("2");
+  await page.getByLabel("¿Cuántos kilogramos contiene cada saco?").fill("50");
+  await page.getByLabel("¿Cuánto pagaste por toda la compra?").fill("80");
+  await expect(page.locator(".nota")).toContainText("100 kg");
+  await page
+    .getByRole("button", { name: "Guardar movimiento", exact: true })
+    .click();
+  let s = await datos(page);
+  expect(s.productos[0].stockQ).toBe(100000);
+  expect(s.productos[0].valorCents).toBe(8000);
+  await ir(page, "Vender");
+  await page.getByRole("button", { name: /^Arroz por sacos/ }).click();
+  await page.getByLabel("Cantidad de Arroz por sacos").fill("1.5");
+  await page
+    .getByRole("button", { name: "Confirmar venta", exact: true })
+    .click();
+  expect((await datos(page)).productos[0].stockQ).toBe(98500);
+  await ir(page, "Inventario");
+  await page.getByRole("button", { name: "Reponer", exact: true }).click();
+  await page
+    .getByLabel("¿Cómo quieres ingresar la cantidad?")
+    .selectOption("envases");
+  await page.getByLabel("¿Cuántos envases compraste?").fill("1");
+  await page.getByLabel("¿Cuántos kilogramos contiene cada saco?").fill("50");
+  await page.getByLabel("¿Cuánto pagaste por toda la compra?").fill("45");
+  await page
+    .getByRole("button", { name: "Guardar movimiento", exact: true })
+    .click();
+  s = await datos(page);
+  expect(s.productos[0].stockQ).toBe(148500);
+  expect(s.productos[0].valorCents).toBe(12380);
+  await page.reload();
+  await ir(page, "Inventario");
+  expect((await datos(page)).productos[0].stockQ).toBe(148500);
+  await expect(
+    page.getByRole("heading", { name: "Arroz por sacos", exact: true }),
+  ).toBeVisible();
+});
+
+test("respaldo se comparte como archivo completo; cancelar no anuncia entrega", async ({
+  page,
+}) => {
+  await configurar(page);
+  await ir(page, "Configuración");
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async ({ files }) => {
+        window.respaldoCompartido = JSON.parse(await files[0].text());
+      },
+    });
+  });
+  await page
+    .getByRole("button", { name: "Compartir respaldo", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "no puede confirmar su entrega",
+  );
+  const compartido = await page.evaluate(() => window.respaldoCompartido);
+  expect(JSON.stringify(compartido)).toContain("Tienda de prueba");
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async () => {
+        throw new DOMException("Cancelado", "AbortError");
+      },
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Compartir respaldo", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("No se compartió");
+});
+
+test("si compartir archivos no está disponible se descarga respaldo restaurable", async ({
+  page,
+}) => {
+  await configurar(page);
+  await ir(page, "Configuración");
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => false,
+    }),
+  );
+  const descarga = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Compartir respaldo", exact: true })
+    .click();
+  expect((await descarga).suggestedFilename()).toMatch(
+    /aliado-respaldo-.*\.json/,
+  );
+  await expect(page.getByRole("status")).toContainText(
+    "adjunta el archivo .json como documento",
+  );
 });

@@ -72,7 +72,7 @@ test("tienda real local: venta, alerta, merma, reposición, cierre y respaldo", 
   await configurar(page);
   await producto(page);
   await ir(page, "Caja");
-  await page.getByLabel("Efectivo al abrir hoy").fill("20");
+  await page.getByLabel("Dinero que tienes en caja al empezar el día").fill("20");
   await page.getByRole("button", { name: "Registrar fondo inicial" }).click();
   await ir(page, "Vender");
   await page.getByRole("button", { name: /^Leche/ }).click();

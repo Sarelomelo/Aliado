@@ -21,14 +21,16 @@ export default function Caja({ estado: s, actuar, ocupado }) {
     [metodo, setMetodo] = useState("efectivo");
   const hoy = diaEcuador(),
     movs = s.movimientos.filter((m) => diaEcuador(m.fecha) === hoy),
-    abierto = movs.some((m) => m.tipo === "apertura"),
+    apertura = movs.find((m) => m.tipo === "apertura"),
+    abierto = !!apertura,
     esperado = movs.reduce((sum, m) => sum + m.cashCents, 0);
   return (
     <>
       <h2>Caja y gastos</h2>
       <p>
-        Los cobros, compras y gastos registrados determinan la caja esperada.
-        Las ventas fiadas no suman efectivo hasta que se cobran.
+        El dinero inicial es lo que tenías al empezar. El dinero que debería
+        haber ahora cambia con los cobros y pagos en efectivo que registras.
+        Los fiados sin cobrar y las transferencias no suman dinero en caja.
       </p>
       {!abierto ? (
         <Formulario
@@ -39,7 +41,7 @@ export default function Caja({ estado: s, actuar, ocupado }) {
           }}
         >
           <Importe
-            label="Efectivo al abrir hoy"
+            label="Dinero que tienes en caja al empezar el día"
             value={fondo}
             onChange={(e) => setFondo(e.target.value)}
             required
@@ -48,7 +50,16 @@ export default function Caja({ estado: s, actuar, ocupado }) {
         </Formulario>
       ) : (
         <div className="indicadores">
-          <Tarjeta label="Efectivo esperado hoy" valor={dinero(esperado)} />
+          <Tarjeta
+            label="Dinero que tienes en caja al empezar el día"
+            valor={dinero(apertura.cashCents)}
+            detalle="Este monto inicial no cambia con las ventas del día."
+          />
+          <Tarjeta
+            label="Dinero que debería haber en caja ahora"
+            valor={dinero(esperado)}
+            detalle="Calculado con el dinero inicial y los movimientos registrados; compruébalo contando tu caja."
+          />
           <Tarjeta
             label="Movimiento neto en transferencias hoy"
             valor={dinero(movs.reduce((sum, m) => sum + m.transferCents, 0))}

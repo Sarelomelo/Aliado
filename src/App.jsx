@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
+import { importe, unidades, sumarImportes, deuda, validarFiado, diaEcuador, mermasDelMes, validarDatos, validarRespaldo, restaurarDatos, estimarCierre } from './datos.js'
 
 function formatearFecha(iso) {
   const d = new Date(iso)
@@ -10,18 +11,13 @@ function formatearFecha(iso) {
 }
 
 function esHoy(iso) {
-  const d = new Date(iso)
-  const hoy = new Date()
-  return d.toDateString() === hoy.toDateString()
+  return diaEcuador(iso) === diaEcuador()
 }
 
 function diasDesde(iso) {
-  const d = new Date(iso)
-  const hoy = new Date()
-  d.setHours(0, 0, 0, 0)
-  hoy.setHours(0, 0, 0, 0)
-  const diff = hoy.getTime() - d.getTime()
-  return Math.floor(diff / (1000 * 60 * 60 * 24))
+  const inicio = Date.parse(diaEcuador(iso) + 'T00:00:00Z')
+  const hoy = Date.parse(diaEcuador() + 'T00:00:00Z')
+  return Math.max(0, Math.floor((hoy - inicio) / 86400000))
 }
 
 function colorAntiguedad(dias) {
@@ -61,19 +57,23 @@ function textoDias(dias) {
 
 function useLocalStorage(clave, valorInicial) {
   const [valor, setValor] = useState(() => {
-    try {
-      const guardado = localStorage.getItem(clave)
-      return guardado ? JSON.parse(guardado) : valorInicial
-    } catch {
-      return valorInicial
-    }
+    const guardado = localStorage.getItem(clave)
+    // Un registro corrupto nunca se sustituye silenciosamente por una lista vacía.
+    return guardado === null ? valorInicial : validarDatos(clave, JSON.parse(guardado))
   })
 
-  useEffect(() => {
-    localStorage.setItem(clave, JSON.stringify(valor))
-  }, [clave, valor])
-
-  return [valor, setValor]
+  function guardarValor(nuevoValor) {
+    try {
+      const nuevo = typeof nuevoValor === 'function' ? nuevoValor(valor) : nuevoValor
+      validarDatos(clave, nuevo)
+      localStorage.setItem(clave, JSON.stringify(nuevo))
+      setValor(nuevo)
+    } catch (error) {
+      alert(`No se guardaron los cambios: ${error.message}`)
+      throw error
+    }
+  }
+  return [valor, guardarValor]
 }
 
 function formatearTelefonoWhatsApp(tel) {
@@ -86,25 +86,12 @@ function formatearTelefonoWhatsApp(tel) {
 
 // ---------- CONFIGURACIÓN INICIAL ----------
 function Configuracion({ onGuardar, modoEdicion }) {
-  const [nombreTienda, setNombreTienda] = useState('')
-  const [nombreDueno, setNombreDueno] = useState('')
-  const [telefono, setTelefono] = useState('')
+  const [tiendaInicial] = useState(() => modoEdicion ? JSON.parse(localStorage.getItem('tienda') || '{}') : {})
+  const [nombreTienda, setNombreTienda] = useState(tiendaInicial.nombreTienda || '')
+  const [nombreDueno, setNombreDueno] = useState(tiendaInicial.nombreDueno || '')
+  const [telefono, setTelefono] = useState(tiendaInicial.telefono || '')
   const [mensajeBackup, setMensajeBackup] = useState('')
-
   const fileInputRef = useRef(null)
-
-  // Cargar datos si es edición
-  useEffect(() => {
-    if (modoEdicion) {
-      const guardado = localStorage.getItem('tienda')
-      if (guardado) {
-        const t = JSON.parse(guardado)
-        setNombreTienda(t.nombreTienda || '')
-        setNombreDueno(t.nombreDueno || '')
-        setTelefono(t.telefono || '')
-      }
-    }
-  }, [modoEdicion])
 
   function guardar(e) {
     e.preventDefault()
@@ -117,15 +104,15 @@ function Configuracion({ onGuardar, modoEdicion }) {
   }
 
   function descargarRespaldo() {
-    const datos = {
-      version: 1,
+    const datos = validarRespaldo({
+      version: 2,
       fecha: new Date().toISOString(),
       tienda: JSON.parse(localStorage.getItem('tienda') || 'null'),
       fiados: JSON.parse(localStorage.getItem('fiados') || '[]'),
       mermas: JSON.parse(localStorage.getItem('mermas') || '[]'),
       cierres: JSON.parse(localStorage.getItem('cierres') || '[]'),
       productos: JSON.parse(localStorage.getItem('productos') || '[]'),
-    }
+    })
 
     const blob = new Blob([JSON.stringify(datos, null, 2)], {
       type: 'application/json',
@@ -143,15 +130,15 @@ function Configuracion({ onGuardar, modoEdicion }) {
   }
 
   function enviarRespaldoWhatsApp() {
-    const datos = {
-      version: 1,
+    const datos = validarRespaldo({
+      version: 2,
       fecha: new Date().toISOString(),
       tienda: JSON.parse(localStorage.getItem('tienda') || 'null'),
       fiados: JSON.parse(localStorage.getItem('fiados') || '[]'),
       mermas: JSON.parse(localStorage.getItem('mermas') || '[]'),
       cierres: JSON.parse(localStorage.getItem('cierres') || '[]'),
       productos: JSON.parse(localStorage.getItem('productos') || '[]'),
-    }
+    })
 
     const texto = JSON.stringify(datos)
     const textoCodificado = encodeURIComponent(texto)
@@ -181,25 +168,15 @@ function Configuracion({ onGuardar, modoEdicion }) {
     const reader = new FileReader()
     reader.onload = (event) => {
       try {
-        const datos = JSON.parse(event.target.result)
-
-        if (datos.tienda)
-          localStorage.setItem('tienda', JSON.stringify(datos.tienda))
-        if (datos.fiados)
-          localStorage.setItem('fiados', JSON.stringify(datos.fiados))
-        if (datos.mermas)
-          localStorage.setItem('mermas', JSON.stringify(datos.mermas))
-        if (datos.cierres)
-          localStorage.setItem('cierres', JSON.stringify(datos.cierres))
-        if (datos.productos)
-          localStorage.setItem('productos', JSON.stringify(datos.productos))
+        restaurarDatos(localStorage, JSON.parse(event.target.result))
 
         setMensajeBackup('✅ Respaldo restaurado. Recargando...')
         setTimeout(() => location.reload(), 1000)
       } catch (err) {
-        setMensajeBackup('❌ Error al leer el archivo. Verifica que sea válido.')
+        setMensajeBackup(`❌ ${err.message}`)
       }
     }
+    reader.onerror = () => setMensajeBackup('❌ No se pudo leer el archivo.')
     reader.readAsText(archivo)
     e.target.value = ''
   }
@@ -346,18 +323,14 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onProductos, onConfig }
   const [cierres] = useLocalStorage('cierres', [])
   const [productos] = useLocalStorage('productos', [])
 
-  const totalFiado = fiados.reduce((s, f) => {
-    const pagado = f.abonos.reduce((a, ab) => a + ab.monto, 0)
-    return s + (f.monto - pagado)
-  }, 0)
-
-  const totalMerma = mermas.reduce((s, m) => s + m.valor, 0)
+  const totalFiado = sumarImportes(fiados.map(deuda))
+  const mermasMes = mermasDelMes(mermas)
+  const totalMerma = sumarImportes(mermasMes.map(m => m.valor))
   const cierreHoy = cierres.find(c => esHoy(c.fecha))
 
   const clientesVencidos = fiados.filter(f => {
-    const pagado = f.abonos.reduce((a, ab) => a + ab.monto, 0)
-    const deuda = f.monto - pagado
-    if (deuda <= 0) return false
+    const saldo = deuda(f)
+    if (saldo <= 0) return false
     const ultimoMovimiento =
       f.abonos.length > 0 ? f.abonos[f.abonos.length - 1].fecha : f.fecha
     return diasDesde(ultimoMovimiento) >= 15
@@ -402,10 +375,10 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onProductos, onConfig }
           <p className="text-2xl font-bold text-gray-800">
             $ {totalFiado.toFixed(2)}
           </p>
-          <p className="text-xs text-gray-400">{fiados.length} clientes</p>
+          <p className="text-xs text-gray-400">{fiados.length} registros de fiado</p>
           {clientesVencidos > 0 && (
             <p className="text-xs text-orange-600 font-medium mt-1">
-              ⚠️ {clientesVencidos} con deuda vencida
+              ⚠️ {clientesVencidos} fiados sin movimiento en 15 días
             </p>
           )}
         </div>
@@ -415,18 +388,18 @@ function Inicio({ tienda, onFiado, onMerma, onCerrarDia, onProductos, onConfig }
           <p className="text-2xl font-bold text-gray-800">
             $ {totalMerma.toFixed(2)}
           </p>
-          <p className="text-xs text-gray-400">{mermas.length} productos</p>
+          <p className="text-xs text-gray-400">{mermasMes.length} registros este mes</p>
         </div>
 
         <div className="bg-white rounded-xl p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Ventas de hoy</p>
+          <p className="text-sm text-gray-500">Ventas estimadas de hoy</p>
           {cierreHoy ? (
             <>
               <p className="text-2xl font-bold text-green-600">
                 $ {cierreHoy.ventasTotales.toFixed(2)}
               </p>
               <p className="text-xs text-gray-400">
-                Ganancia estimada: ${cierreHoy.gananciaEstimada.toFixed(2)}
+                Estimación guardada; actualiza el cierre si cambias movimientos. Rentabilidad: no calculada
               </p>
               <button
                 onClick={onCerrarDia}
@@ -560,13 +533,16 @@ function Productos({ onVolver }) {
     e.preventDefault()
     if (!nombre.trim()) return
 
-    const datos = {
-      nombre: nombre.trim(),
-      precioCompra: parseFloat(precioCompra) || 0,
-      precioVenta: parseFloat(precioVenta) || 0,
-      stock: parseInt(stock) || 0,
-      stockMinimo: parseInt(stockMinimo) || 0,
-    }
+    let datos
+    try {
+      datos = {
+        nombre: nombre.trim(),
+        precioCompra: importe(precioCompra, true),
+        precioVenta: importe(precioVenta, true),
+        stock: unidades(stock, true),
+        stockMinimo: unidades(stockMinimo, true),
+      }
+    } catch (error) { alert(error.message); return }
 
     if (editandoId) {
       const actualizado = productos.map(p =>
@@ -575,7 +551,7 @@ function Productos({ onVolver }) {
       setProductos(actualizado)
     } else {
       const nuevo = {
-        id: Date.now(),
+        id: crypto.randomUUID(),
         ...datos,
         fecha: new Date().toISOString(),
       }
@@ -593,10 +569,12 @@ function Productos({ onVolver }) {
 
   function guardarStock(e) {
     e.preventDefault()
-    const cant = parseInt(cantidadLote)
-    if (!cant || cant <= 0) return
-
-    const costo = parseFloat(costoLote)
+    let cant, costo
+    try {
+      cant = unidades(cantidadLote)
+      costo = importe(costoLote, true)
+      if (cant <= 0) throw new Error('La entrada debe ser mayor que cero.')
+    } catch (error) { alert(error.message); return }
 
     const actualizado = productos.map(p => {
       if (p.id === agregandoStockId) {
@@ -604,7 +582,7 @@ function Productos({ onVolver }) {
         return {
           ...p,
           stock: nuevoStock,
-          precioCompra: costo > 0 ? costo : p.precioCompra,
+          precioCompra: costoLote === '' ? p.precioCompra : costo,
         }
       }
       return p
@@ -659,6 +637,7 @@ function Productos({ onVolver }) {
             </label>
             <input
               type="number"
+              min="0"
               step="1"
               value={cantidadLote}
               onChange={(e) => setCantidadLote(e.target.value)}
@@ -674,6 +653,7 @@ function Productos({ onVolver }) {
             </label>
             <input
               type="number"
+              min="0"
               step="0.01"
               value={costoLote}
               onChange={(e) => setCostoLote(e.target.value)}
@@ -751,6 +731,7 @@ function Productos({ onVolver }) {
               </label>
               <input
                 type="number"
+              min="0"
                 step="0.01"
                 value={precioCompra}
                 onChange={(e) => setPrecioCompra(e.target.value)}
@@ -764,6 +745,7 @@ function Productos({ onVolver }) {
               </label>
               <input
                 type="number"
+              min="0"
                 step="0.01"
                 value={precioVenta}
                 onChange={(e) => setPrecioVenta(e.target.value)}
@@ -803,6 +785,7 @@ function Productos({ onVolver }) {
               </label>
               <input
                 type="number"
+              min="0"
                 step="1"
                 value={stock}
                 onChange={(e) => setStock(e.target.value)}
@@ -816,6 +799,7 @@ function Productos({ onVolver }) {
               </label>
               <input
                 type="number"
+              min="0"
                 step="1"
                 value={stockMinimo}
                 onChange={(e) => setStockMinimo(e.target.value)}
@@ -977,8 +961,7 @@ function Fiado({ onVolver, tienda }) {
   const [montoAbono, setMontoAbono] = useState('')
 
   function calcularDeuda(fiado) {
-    const pagado = fiado.abonos.reduce((s, a) => s + a.monto, 0)
-    return fiado.monto - pagado
+    return deuda(fiado)
   }
 
   function diasUltimoMovimiento(fiado) {
@@ -989,7 +972,7 @@ function Fiado({ onVolver, tienda }) {
     return diasDesde(ultimoMovimiento)
   }
 
-  const totalPendiente = fiados.reduce((s, f) => s + calcularDeuda(f), 0)
+  const totalPendiente = sumarImportes(fiados.map(calcularDeuda))
   const seleccionado = fiados.find(f => f.id === seleccionadoId)
 
   const fiadosOrdenados = [...fiados].sort((a, b) => {
@@ -1017,12 +1000,17 @@ function Fiado({ onVolver, tienda }) {
 
   function guardarNuevo(e) {
     e.preventDefault()
-    if (!nombre.trim() || !monto || parseFloat(monto) <= 0) return
+    if (!nombre.trim()) return
+    let montoValidado
+    try {
+      montoValidado = importe(monto)
+      if (montoValidado <= 0) throw new Error('El fiado debe ser mayor que cero.')
+    } catch (error) { alert(error.message); return }
     const nuevo = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       nombre: nombre.trim(),
       telefono: telefono.trim(),
-      monto: parseFloat(monto),
+      monto: montoValidado,
       abonos: [],
       recordatorios: [],
       fecha: new Date().toISOString(),
@@ -1033,14 +1021,21 @@ function Fiado({ onVolver, tienda }) {
 
   function guardarEdicion(e) {
     e.preventDefault()
-    if (!nombre.trim() || !monto || parseFloat(monto) <= 0) return
+    if (!nombre.trim()) return
+    let montoValidado
+    try {
+      montoValidado = importe(monto)
+      if (montoValidado <= 0) throw new Error('El fiado debe ser mayor que cero.')
+    } catch (error) { alert(error.message); return }
+    try { validarFiado({ ...seleccionado, monto: montoValidado }) }
+    catch (error) { alert(error.message); return }
     const actualizado = fiados.map(f => {
       if (f.id === seleccionadoId) {
         return {
           ...f,
           nombre: nombre.trim(),
           telefono: telefono.trim(),
-          monto: parseFloat(monto),
+          monto: montoValidado,
         }
       }
       return f
@@ -1051,14 +1046,18 @@ function Fiado({ onVolver, tienda }) {
 
   function guardarAbono(e) {
     e.preventDefault()
-    if (!montoAbono || parseFloat(montoAbono) <= 0) return
+    let valor
+    try {
+      valor = importe(montoAbono)
+      validarFiado({ ...seleccionado, abonos: [...seleccionado.abonos, { monto: valor }] })
+    } catch (error) { alert(error.message); return }
     const actualizado = fiados.map(f => {
       if (f.id === seleccionadoId) {
         return {
           ...f,
           abonos: [
             ...f.abonos,
-            { monto: parseFloat(montoAbono), fecha: new Date().toISOString() },
+            { monto: valor, fecha: new Date().toISOString() },
           ],
         }
       }
@@ -1083,8 +1082,11 @@ function Fiado({ onVolver, tienda }) {
   }
 
   function actualizarAbono(idx, nuevoMonto) {
-    const valor = parseFloat(nuevoMonto)
-    if (!valor || valor <= 0) return
+    let valor
+    try {
+      valor = importe(nuevoMonto)
+      validarFiado({ ...seleccionado, abonos: seleccionado.abonos.map((a, i) => i === idx ? { ...a, monto: valor } : a) })
+    } catch (error) { alert(error.message); return }
     const actualizado = fiados.map(f => {
       if (f.id === seleccionadoId) {
         return {
@@ -1189,6 +1191,7 @@ function Fiado({ onVolver, tienda }) {
             </label>
             <input
               type="number"
+              min="0"
               step="0.01"
               value={monto}
               onChange={(e) => setMonto(e.target.value)}
@@ -1214,56 +1217,6 @@ function Fiado({ onVolver, tienda }) {
     const ultimoRecordatorio = recordatorios[recordatorios.length - 1]
     const dias = diasUltimoMovimiento(seleccionado)
     const color = colorAntiguedad(dias)
-
-    // ESTADÍSTICAS DEL CLIENTE
-    const fiadosDelCliente = fiados.filter(
-      f =>
-        f.nombre.toLowerCase().trim() ===
-        seleccionado.nombre.toLowerCase().trim()
-    )
-    const totalHistorico = fiadosDelCliente.reduce(
-      (s, f) => s + f.monto,
-      0
-    )
-    const totalPagadoHistorico = fiadosDelCliente.reduce(
-      (s, f) => s + f.abonos.reduce((sa, a) => sa + a.monto, 0),
-      0
-    )
-    const vecesFiado = fiadosDelCliente.length
-
-    // Días promedio de pago (solo para fiados ya pagados)
-    const fiadosPagados = fiadosDelCliente.filter(f => {
-      const pagado = f.abonos.reduce((s, a) => s + a.monto, 0)
-      return pagado >= f.monto
-    })
-
-    let promedioDiasPago = null
-    if (fiadosPagados.length > 0) {
-      const totalDias = fiadosPagados.reduce((s, f) => {
-        const ultimoAbono = f.abonos[f.abonos.length - 1]
-        if (!ultimoAbono) return s
-        const dias = Math.floor(
-          (new Date(ultimoAbono.fecha).getTime() -
-            new Date(f.fecha).getTime()) /
-            (1000 * 60 * 60 * 24)
-        )
-        return s + dias
-      }, 0)
-      promedioDiasPago = Math.round(totalDias / fiadosPagados.length)
-    }
-
-    // Cliente desde
-    const fechaMasAntigua = fiadosDelCliente.reduce((min, f) => {
-      const d = new Date(f.fecha).getTime()
-      return d < min ? d : min
-    }, Date.now())
-    const clienteDesde = new Date(fechaMasAntigua).toISOString()
-
-    // Buena paga
-    const porcentajePagado =
-      totalHistorico > 0
-        ? (totalPagadoHistorico / totalHistorico) * 100
-        : 0
 
     return (
       <div className="min-h-screen bg-gray-100 p-4">
@@ -1315,60 +1268,9 @@ function Fiado({ onVolver, tienda }) {
           </button>
         )}
 
-        {/* TARJETA DE ESTADÍSTICAS */}
-        {vecesFiado > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-            <p className="text-xs text-blue-700 font-medium mb-3">
-              📊 Historial del cliente
-            </p>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Cliente desde</span>
-                <span className="font-medium">{formatearFecha(clienteDesde)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Veces que le has fiado</span>
-                <span className="font-medium">{vecesFiado}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total fiado histórico</span>
-                <span className="font-medium">$ {totalHistorico.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total pagado</span>
-                <span className="font-medium text-green-600">
-                  $ {totalPagadoHistorico.toFixed(2)}
-                </span>
-              </div>
-              {promedioDiasPago !== null && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Paga en promedio</span>
-                  <span className="font-medium">
-                    {promedioDiasPago} {promedioDiasPago === 1 ? 'día' : 'días'}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between border-t border-blue-200 pt-2 mt-2">
-                <span className="font-semibold text-blue-800">
-                  {porcentajePagado >= 90
-                    ? '⭐ Excelente pagador'
-                    : porcentajePagado >= 70
-                    ? '👍 Buen pagador'
-                    : porcentajePagado >= 50
-                    ? '⚠️ Pago irregular'
-                    : '🚨 Mal pagador'}
-                </span>
-                <span className="font-bold text-blue-800">
-                  {porcentajePagado.toFixed(0)}% pagado
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {ultimoRecordatorio && (
           <p className="text-xs text-gray-400 text-center mb-4">
-            Último recordatorio: {formatearFecha(ultimoRecordatorio.fecha)}
+            Último intento de WhatsApp: {formatearFecha(ultimoRecordatorio.fecha)}
           </p>
         )}
 
@@ -1438,7 +1340,7 @@ function Fiado({ onVolver, tienda }) {
             {recordatorios.length > 0 && (
               <div className="border-t border-gray-100 pt-2">
                 <p className="text-xs text-gray-400 mb-2">
-                  Recordatorios enviados
+                  Intentos de apertura de WhatsApp (envío no confirmado)
                 </p>
                 {recordatorios.map((r, i) => (
                   <div
@@ -1464,6 +1366,7 @@ function Fiado({ onVolver, tienda }) {
           <div className="flex gap-2">
             <input
               type="number"
+              min="0"
               step="0.01"
               value={montoAbono}
               onChange={(e) => setMontoAbono(e.target.value)}
@@ -1576,6 +1479,7 @@ function AbonoEdicion({ montoInicial, onCancelar, onGuardar }) {
     <div className="flex gap-2 items-center bg-gray-50 p-2 rounded-lg">
       <input
         type="number"
+              min="0"
         step="0.01"
         value={valor}
         onChange={(e) => setValor(e.target.value)}
@@ -1609,7 +1513,7 @@ function Merma({ onVolver }) {
   const [motivo, setMotivo] = useState('vencido')
   const [valor, setValor] = useState('')
 
-  const totalMerma = mermas.reduce((s, m) => s + m.valor, 0)
+  const totalMerma = sumarImportes(mermas.map(m => m.valor))
 
   function abrirNueva() {
     setEditandoId(null)
@@ -1631,7 +1535,13 @@ function Merma({ onVolver }) {
 
   function guardar(e) {
     e.preventDefault()
-    if (!producto.trim() || !cantidad || parseFloat(cantidad) <= 0) return
+    if (!producto.trim()) return
+    let cantidadValidada, valorValidado
+    try {
+      cantidadValidada = unidades(cantidad)
+      valorValidado = importe(valor, true)
+      if (cantidadValidada <= 0) throw new Error('La cantidad debe ser mayor que cero.')
+    } catch (error) { alert(error.message); return }
 
     if (editandoId) {
       const actualizada = mermas.map(m => {
@@ -1639,9 +1549,9 @@ function Merma({ onVolver }) {
           return {
             ...m,
             producto: producto.trim(),
-            cantidad: parseInt(cantidad),
+            cantidad: cantidadValidada,
             motivo,
-            valor: parseFloat(valor) || 0,
+            valor: valorValidado,
           }
         }
         return m
@@ -1649,11 +1559,11 @@ function Merma({ onVolver }) {
       setMermas(actualizada)
     } else {
       const nueva = {
-        id: Date.now(),
+        id: crypto.randomUUID(),
         producto: producto.trim(),
-        cantidad: parseInt(cantidad),
+        cantidad: cantidadValidada,
         motivo,
-        valor: parseFloat(valor) || 0,
+        valor: valorValidado,
         fecha: new Date().toISOString(),
       }
       setMermas([nueva, ...mermas])
@@ -1722,6 +1632,7 @@ function Merma({ onVolver }) {
             </label>
             <input
               type="number"
+              min="0"
               step="1"
               value={cantidad}
               onChange={(e) => setCantidad(e.target.value)}
@@ -1758,6 +1669,7 @@ function Merma({ onVolver }) {
             </label>
             <input
               type="number"
+              min="0"
               step="0.01"
               value={valor}
               onChange={(e) => setValor(e.target.value)}
@@ -1851,21 +1763,10 @@ function CerrarDia({ onVolver, tienda }) {
   const [fiados] = useLocalStorage('fiados', [])
   const [cierres, setCierres] = useLocalStorage('cierres', [])
 
-  const hoy = new Date().toDateString()
-  const cierreHoy = cierres.find(c => new Date(c.fecha).toDateString() === hoy)
+  const cierreHoy = cierres.find(c => esHoy(c.fecha))
 
-  const fiadoDadoHoy = fiados
-    .filter(f => esHoy(f.fecha))
-    .reduce((s, f) => s + f.monto, 0)
-
-  const fiadoCobradoHoy = fiados.reduce((s, f) => {
-    return (
-      s +
-      f.abonos
-        .filter(a => esHoy(a.fecha))
-        .reduce((sa, a) => sa + a.monto, 0)
-    )
-  }, 0)
+  const fiadoDadoHoy = sumarImportes(fiados.filter(f => esHoy(f.fecha)).map(f => f.monto))
+  const fiadoCobradoHoy = sumarImportes(fiados.flatMap(f => f.abonos.filter(a => esHoy(a.fecha)).map(a => a.monto)))
 
   const [efectivoFinal, setEfectivoFinal] = useState(
     cierreHoy ? String(cierreHoy.efectivoFinal) : ''
@@ -1876,35 +1777,28 @@ function CerrarDia({ onVolver, tienda }) {
   const [retiro, setRetiro] = useState(cierreHoy ? String(cierreHoy.retiro) : '0')
   const [mostrarResumen, setMostrarResumen] = useState(false)
 
-  const MARGEN = 0.25
-
   function calcular() {
-    const ef = parseFloat(efectivoFinal) || 0
-    const ei = parseFloat(efectivoInicial) || 0
-    const r = parseFloat(retiro) || 0
-
-    const ventasEfectivo = ef - ei + r
-    const ventasTotales = ventasEfectivo + fiadoDadoHoy - fiadoCobradoHoy
-    const gananciaEstimada = ventasTotales * MARGEN
-
-    return {
-      ventasEfectivo,
-      ventasTotales,
-      gananciaEstimada,
-      fiadoDadoHoy,
-      fiadoCobradoHoy,
-    }
+    // Vista previa: los importes inválidos se rechazan al guardar.
+    try {
+      return estimarCierre({ efectivoFinal: importe(efectivoFinal, true), efectivoInicial: importe(efectivoInicial, true), retiro: importe(retiro, true), fiadoDadoHoy, fiadoCobradoHoy })
+    } catch { return { ventasEfectivo: 0, ventasTotales: 0, gananciaEstimada: null } }
   }
 
   function guardar(e) {
     e.preventDefault()
+    try {
+      importe(efectivoFinal); importe(efectivoInicial); importe(retiro, true)
+    } catch (error) { alert(error.message); return }
     const r = calcular()
+    if (r.ventasTotales < 0) {
+      alert('El cierre da ventas negativas. Revisa caja y movimientos antes de guardar.'); return
+    }
     const nuevo = {
-      id: cierreHoy ? cierreHoy.id : Date.now(),
+      id: cierreHoy ? cierreHoy.id : crypto.randomUUID(),
       fecha: new Date().toISOString(),
-      efectivoFinal: parseFloat(efectivoFinal) || 0,
-      efectivoInicial: parseFloat(efectivoInicial) || 0,
-      retiro: parseFloat(retiro) || 0,
+      efectivoFinal: importe(efectivoFinal),
+      efectivoInicial: importe(efectivoInicial),
+      retiro: importe(retiro, true),
       fiadoDadoHoy: r.fiadoDadoHoy,
       fiadoCobradoHoy: r.fiadoCobradoHoy,
       ventasEfectivo: r.ventasEfectivo,
@@ -1930,9 +1824,7 @@ function CerrarDia({ onVolver, tienda }) {
 
     const mensaje = `📊 *Resumen del día — ${
       tienda?.nombreTienda || 'Mi tienda'
-    }*\n📅 ${fecha}\n\n💰 Ventas: $${r.ventasTotales.toFixed(2)}\n📈 Ganancia estimada: $${r.gananciaEstimada.toFixed(
-      2
-    )}\n\n💳 Fiado prestado: $${fiadoDadoHoy.toFixed(
+    }*\n📅 ${fecha}\n\n💰 Ventas estimadas: $${r.ventasTotales.toFixed(2)}\n📈 Rentabilidad: no calculada\n\n💳 Fiado prestado: $${fiadoDadoHoy.toFixed(
       2
     )}\n✅ Fiado cobrado: $${fiadoCobradoHoy.toFixed(
       2
@@ -1958,6 +1850,8 @@ function CerrarDia({ onVolver, tienda }) {
         })}
       </p>
 
+      <p className="text-sm text-gray-600 mb-4">Este cierre estima ventas a partir de caja y fiados. No incluye gastos, compras, aportes ni pagos electrónicos. No calcula utilidad contable. Si cambias fiados o abonos después de cerrar, vuelve a actualizar el cierre.</p>
+
       {mostrarResumen ? (
         <div className="space-y-4">
           <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
@@ -1972,15 +1866,15 @@ function CerrarDia({ onVolver, tienda }) {
             <p className="text-xs text-gray-500 mb-3">Resumen del día</p>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Ventas totales</span>
+                <span className="text-gray-600">Ventas estimadas</span>
                 <span className="font-bold text-green-600">
                   $ {r.ventasTotales.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Ganancia estimada</span>
+                <span className="text-gray-600">Rentabilidad</span>
                 <span className="font-medium">
-                  $ {r.gananciaEstimada.toFixed(2)}
+                  No calculada
                 </span>
               </div>
               <div className="flex justify-between">
@@ -2022,6 +1916,7 @@ function CerrarDia({ onVolver, tienda }) {
               </label>
               <input
                 type="number"
+              min="0"
                 step="0.01"
                 value={efectivoFinal}
                 onChange={(e) => setEfectivoFinal(e.target.value)}
@@ -2037,6 +1932,7 @@ function CerrarDia({ onVolver, tienda }) {
               </label>
               <input
                 type="number"
+              min="0"
                 step="0.01"
                 value={efectivoInicial}
                 onChange={(e) => setEfectivoInicial(e.target.value)}
@@ -2051,6 +1947,7 @@ function CerrarDia({ onVolver, tienda }) {
               </label>
               <input
                 type="number"
+              min="0"
                 step="0.01"
                 value={retiro}
                 onChange={(e) => setRetiro(e.target.value)}
@@ -2083,23 +1980,23 @@ function CerrarDia({ onVolver, tienda }) {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ventas en efectivo</span>
+                  <span className="text-gray-600">Variación ajustada de caja</span>
                   <span className="font-medium">
                     $ {r.ventasEfectivo.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-base border-t border-blue-200 pt-2">
                   <span className="font-semibold text-blue-800">
-                    Ventas totales
+                    Ventas estimadas
                   </span>
                   <span className="font-bold text-blue-800">
                     $ {r.ventasTotales.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Ganancia estimada (25%)</span>
+                  <span className="text-gray-600">Rentabilidad</span>
                   <span className="font-medium text-green-600">
-                    $ {r.gananciaEstimada.toFixed(2)}
+                    No calculada
                   </span>
                 </div>
               </div>
@@ -2129,7 +2026,7 @@ function CerrarDia({ onVolver, tienda }) {
                         {formatearFecha(c.fecha)}
                       </p>
                       <p className="text-xs text-gray-400">
-                        Ganancia: ${c.gananciaEstimada.toFixed(2)}
+                        Rentabilidad: no calculada
                       </p>
                     </div>
                     <p className="font-bold text-gray-800">

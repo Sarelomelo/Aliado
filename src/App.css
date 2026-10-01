@@ -1,0 +1,417 @@
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #172638;
+  background: #f2f5f9;
+  font-size: 16px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1 {
+  font-size: 1.65rem;
+}
+h2 {
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+}
+h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.7rem;
+}
+p {
+  line-height: 1.55;
+  margin: 0.5rem 0;
+  color: #40546b;
+}
+small,
+time {
+  font-size: 0.875rem;
+  color: #4d627a;
+}
+small {
+  display: block;
+}
+.app {
+  max-width: 1120px;
+  margin: auto;
+  padding: 1.25rem 1.25rem 3rem;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.marca img {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.marca p {
+  margin: 0;
+}
+nav {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid #d8e2ee;
+  padding: 0.5rem;
+  border-radius: 12px;
+  margin: 1rem 0 1.5rem;
+}
+nav button {
+  border: 0;
+  background: transparent;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  color: #31465e;
+  font-weight: 600;
+}
+nav button.activo {
+  background: #1d4ed8;
+  color: white;
+}
+.boton {
+  border: 1px solid #1d4ed8;
+  border-radius: 9px;
+  padding: 0.8rem 1rem;
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: 600;
+  min-height: 44px;
+}
+.boton.secundario {
+  background: white;
+  color: #1d4ed8;
+  border-color: #becfe5;
+}
+.boton.peligro {
+  background: #fff3f1;
+  border-color: #efb7b0;
+  color: #9f271b;
+}
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.5rem 0 1rem;
+}
+.indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0 1.5rem;
+}
+.tarjeta {
+  padding: 1.2rem;
+  background: white;
+  border: 1px solid #d8e2ee;
+  border-top: 4px solid #2563eb;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.tarjeta strong {
+  font-size: 1.75rem;
+}
+.tarjeta.naranja {
+  border-top-color: #e57a12;
+}
+section {
+  background: #fff;
+  border: 1px solid #d8e2ee;
+  padding: 1.2rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  font-weight: 600;
+}
+.campo input,
+.campo select {
+  width: 100%;
+  border: 1px solid #a8bacf;
+  border-radius: 8px;
+  min-height: 46px;
+  padding: 0.65rem 0.8rem;
+  background: #fff;
+  color: #172638;
+  font-weight: 400;
+}
+.formulario {
+  display: grid;
+  gap: 1rem;
+  max-width: 620px;
+  margin: 0.8rem 0;
+}
+.lista {
+  display: grid;
+  gap: 0.75rem;
+}
+.fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid #e4ebf3;
+}
+.item {
+  padding: 1rem;
+  background: white;
+  border: 1px solid #d8e2ee;
+  border-radius: 10px;
+  margin-bottom: 0.6rem;
+}
+.titulo-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.venta-layout {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1rem;
+}
+.catalogo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+.producto {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #eef5ff;
+  color: #193a68;
+  border: 1px solid #b9cfee;
+  border-radius: 10px;
+  padding: 1rem;
+  min-height: 115px;
+}
+.linea-carrito {
+  border-bottom: 1px solid #e4ebf3;
+  padding-bottom: 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.enlace {
+  border: 0;
+  background: none;
+  color: #1d4ed8;
+  text-align: left;
+  text-decoration: underline;
+  padding: 0.4rem;
+  min-height: 40px;
+}
+.total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.4rem;
+  padding: 0.8rem 0;
+}
+.dos-columnas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.tabla-scroll {
+  overflow: auto;
+  max-width: 100%;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 520px;
+  font-size: 0.95rem;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.85rem;
+  border-bottom: 1px solid #d8e2ee;
+}
+th {
+  background: #edf3fb;
+  white-space: nowrap;
+}
+.aviso,
+.nota {
+  padding: 0.8rem;
+  background: #fff7e8;
+  border-left: 4px solid #d97706;
+  border-radius: 5px;
+  color: #694219;
+}
+.nota {
+  background: #edf3fb;
+  border-color: #2563eb;
+  color: #24415f;
+}
+.texto-naranja {
+  color: #9c4709;
+}
+.banner-practica {
+  background: #fff1c2;
+  border: 2px solid #d79b00;
+  padding: 1rem;
+  border-radius: 12px;
+  display: grid;
+  gap: 0.6rem;
+}
+.banner-practica .acciones {
+  margin: 0;
+}
+.error,
+.exito {
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 9px;
+}
+.error {
+  background: #ffebe9;
+  color: #92251b;
+  border: 1px solid #e6b2ad;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.exito {
+  background: #e6f6ec;
+  color: #17603b;
+  border: 1px solid #b0d7c0;
+}
+.deuda {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  text-align: left;
+  color: inherit;
+  gap: 0.5rem;
+}
+.deuda small {
+  grid-column: 1/-1;
+}
+details {
+  border: 1px solid #d8e2ee;
+  background: white;
+  border-radius: 9px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+summary {
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0;
+}
+footer {
+  font-size: 0.875rem;
+  color: #4d627a;
+  line-height: 1.5;
+  margin-top: 2rem;
+}
+.carrito {
+  align-self: start;
+}
+@media (max-width: 700px) {
+  .app {
+    padding: 1rem 0.75rem 2rem;
+  }
+  header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  header > .boton {
+    font-size: 0.9rem;
+  }
+  nav {
+    gap: 0.1rem;
+  }
+  nav button {
+    padding: 0.7rem 0.6rem;
+    font-size: 0.9rem;
+  }
+  .venta-layout,
+  .dos-columnas {
+    grid-template-columns: 1fr;
+  }
+  .indicadores {
+    grid-template-columns: 1fr 1fr;
+  }
+  .tarjeta {
+    padding: 0.85rem;
+  }
+  .tarjeta strong {
+    font-size: 1.4rem;
+  }
+  .tarjeta span {
+    font-size: 0.9rem;
+  }
+  .fila {
+    flex-wrap: wrap;
+  }
+  .titulo-fila {
+    flex-wrap: wrap;
+  }
+  section {
+    padding: 1rem;
+  }
+  .acciones .boton {
+    flex: 1;
+    min-width: 115px;
+  }
+}
+@media (max-width: 360px) {
+  .indicadores {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,10 +1,10 @@
-# Aliado
+# Aliado · gestión de pequeños comercios
 
-Aplicación web/PWA de gestión sencilla para pequeños comercios: fiados, abonos, mermas, productos y cierres estimados de caja.
+Aplicación web/PWA para registrar ventas, inventario, fiados, mermas y movimientos de caja. Esta versión funciona en el dispositivo y contiene una práctica con tienda ficticia; todavía no es un servicio municipal centralizado.
 
-## Ejecución
+## Ejecutar y verificar
 
-Node.js 20.19+ o 22.12+ compatible con Vite 8. Instalar dependencias desde el archivo de bloqueo; no copiar node_modules entre sistemas operativos.
+Node.js 20.19+ o 22.12+ compatible con Vite 8. No copiar `node_modules` entre sistemas operativos.
 
 ```bash
 npm ci
@@ -15,27 +15,66 @@ npm run build
 npm run preview
 ```
 
-## Correcciones de integridad
+Para las pruebas interactivas:
 
-- Sumas y comparaciones de fiados/abonos/mermas/cierres en centavos; se mantiene almacenamiento en dólares para compatibilidad.
-- Importes no negativos de hasta dos decimales; existencias y cantidades enteras.
-- No se admiten abonos superiores al fiado, ni reducir un fiado por debajo de lo ya abonado.
-- Merma mensual y fechas operativas según America/Guayaquil.
-- Validación de respaldos completos antes de escribir. Intento de reversión si falla una escritura; localStorage no ofrece transacciones ni garantía ante interrupciones del proceso.
-- Datos inválidos al cargar activan una pantalla de recuperación con exportación de originales; nunca se sustituyen silenciosamente por listas vacías.
-- Respaldos nuevos versión 2; se aceptan respaldos válidos versión 1. No importar respaldos versión 2 en versiones antiguas de la aplicación.
-- Se elimina la inferencia de identidad por nombre y las etiquetas de buen/mal pagador. El historial de cada fiado y sus abonos se conserva.
-- Un clic de WhatsApp se describe como intento de apertura, sin confirmar envío.
-- Se retira la ganancia del 25%: no hay datos suficientes para calcular rentabilidad. Los cierres históricos mantienen sus campos originales en el almacenamiento, pero no se presentan como utilidad.
+```bash
+npx playwright install chromium
+npm run test:ui
+```
 
-## Límites actuales
+La prueba de trabajo sin conexión requiere compilar y ejecutar `test:ui` con la variable `ALIADO_TEST_PRODUCCION=1`. En PowerShell: `$env:ALIADO_TEST_PRODUCCION="1"; npm run test:ui`. En Linux/macOS: `ALIADO_TEST_PRODUCCION=1 npm run test:ui`. El navegador puede indicarse mediante `ALIADO_CHROMIUM_PATH` en entornos de pruebas que ya disponen de un ejecutable compatible.
 
-Los registros siguen en localStorage, por navegador y dominio. No hay cuentas, backend, sincronización, panel municipal ni autenticación. No usar esta versión como contabilidad oficial o fuente de rentabilidad del cantón.
+## Funciones
 
-Inventario y merma/fiados todavía no están integrados. Reposición cambia el costo de compra de todo el stock; no hay costeo por lotes, promedio ponderado ni libro de movimientos. Los cierres estiman ventas bajo supuestos de caja: faltan gastos, compras, aportes, pagos electrónicos y ventas por producto. Si cambian fiados o abonos, el cierre guardado debe actualizarse manualmente. Ediciones/eliminaciones no tienen auditoría y varias pestañas pueden competir al escribir.
+- Venta rápida: productos, cantidades y carrito; una confirmación guarda la venta, descuenta stock y registra cobros/deuda juntos. Carrito conservado al navegar, separado entre negocio y práctica. Los carritos no confirmados no sobreviven a recarga.
+- Pago en efectivo, transferencia o fiado con abono inicial opcional. Abonos posteriores no vuelven a contar una venta. Clientes con identificación propia, sin agrupar automáticamente por nombre.
+- Inventario por unidades, kg o litros. Entradas, mínimos, alertas, costo medio y ajustes con motivo. No se edita el stock directamente desde el catálogo.
+- Merma vinculada a producto: descuenta stock y valor al costo, con motivo. Puede anularse si se devuelve físicamente el producto; conserva los registros y el movimiento inverso.
+- Anulación completa de venta: devuelve todos sus productos y costo al inventario, revierte cobros y elimina su saldo pendiente mediante una devolución fechada. No incluye devoluciones parciales o productos que no regresen en condiciones de venta.
+- Caja: fondo inicial, cobros, compras, gastos operativos, aportes y retiros. Cierre con esperado, contado y diferencia, sin inferir ventas desde el efectivo. Correcciones de gastos y abonos mediante anulaciones con motivo.
+- Reportes: hoy, últimos 7 días, mes, año, historial y fechas elegidas. Ventas netas, costo vendido, margen bruto, merma, gastos y resultado operativo registrado. Clasificación por importe, margen o cantidad, filtrando unidad de medida; CSV. Historial diario y detalle de ventas/mermas.
+- Respaldos versión 3, validación de estructura y reconciliación de inventario/ventas, restauración transaccional con copia anterior. Los archivos pueden contener información personal: conservarlos y compartirlos con acceso autorizado.
 
-La siguiente fase debe definir movimientos trazables, identidad de clientes, ventas/costos/gastos, validación de reglas contables y luego cuentas/permisos, respaldo central y sincronización. Los informes municipales requieren cobertura y calidad medibles, con acceso autorizado y protección de datos.
+## Integridad y almacenamiento
 
-## Verificación
+Los importes se calculan en centavos enteros. Las cantidades se almacenan en milésimas, permitiendo fracciones solo para kg/litros. Los importes de líneas se redondean al centavo. El valor del inventario se conserva como un total de centavos: la salida se calcula proporcionalmente y la última salida absorbe el remanente de redondeo.
 
-Pruebas unitarias de reglas monetarias, mes en Ecuador, integridad de respaldos, duplicados y reversión ante fallos de almacenamiento. Compilación de producción y revisión estática. La validación interactiva en dispositivos y del funcionamiento sin conexión sigue pendiente.
+IndexedDB guarda el documento de negocio mediante una transacción de lectura/escritura. Una operación fallida no deja stock ni cobros parciales. El mismo identificador de operación no se procesa dos veces. Las transacciones se serializan entre pestañas y las vistas se refrescan con BroadcastChannel y al recuperar foco. La interfaz muestra éxito solo después del compromiso de la transacción.
+
+La auditoría conserva operaciones y motivos; las anulaciones no borran originales. Es una trazabilidad local, no un registro inalterable, certificado ni auditado por servidor. No es una solución contable/fiscal oficial. Las cifras dependen de la integridad de los registros, costos aportados y gastos capturados; no incluyen impuestos o gastos omitidos.
+
+## Datos de la versión anterior
+
+La primera apertura migra las cinco colecciones locales antiguas a un estado versión 3. También se pueden importar respaldos válidos versión 1 o 2. Las claves originales de localStorage se conservan y una copia completa queda dentro del respaldo nuevo.
+
+- El inventario existente se toma como saldo inicial, sin volver a descontar mermas antiguas.
+- Los fiados se conservan con sus abonos y cada registro recibe un cliente independiente, para no fusionar identidades por nombre. El comerciante debe verificar la identidad de los registros importados.
+- Las mermas históricas conservan el valor estimado original y se identifican como históricas; no se inventa un vínculo de producto.
+- Los cierres antiguos permanecen consultables y exportables como estimaciones separadas. No se convierten en ventas por producto ni en utilidad.
+- Datos inválidos bloquean la migración sin sobrescribir originales. La pantalla permite exportar los originales y restaurar un respaldo válido.
+- Los respaldos versión 3 no deben importarse en versiones antiguas de la app.
+
+## Práctica integrada
+
+El botón **Probar tienda ficticia** abre una simulación en memoria, separada del negocio real. Permite vender, reponer, registrar merma, cobrar fiados y consultar reportes. Reiniciar devuelve la simulación al ejemplo inicial; salir vuelve a los datos reales.
+
+Ejemplo inicial del día: 10 leches a costo $0,70 y venta $1,00; 20 panes; 10 kg de arroz; caja inicial $20,00. Se registran una venta en efectivo, una venta fiada, un abono, una merma, reposición, una venta por peso con transferencia, un gasto y un retiro.
+
+| Indicador | Resultado esperado |
+| --- | ---: |
+| Ventas | $6,75 |
+| Costo vendido | $4,60 |
+| Margen bruto | $2,15 |
+| Merma | $0,70 |
+| Gastos | $0,50 |
+| Resultado operativo registrado | $0,95 |
+| Fiado pendiente | $2,00 |
+| Leches disponibles | 9 |
+| Valor de esas leches | $6,80 |
+| Efectivo esperado y contado | $18,50 |
+
+## Antes de un piloto municipal
+
+Faltan cuentas/permisos, backend, sincronización entre dispositivos, respaldo remoto, panel municipal y revisión profesional contable y de protección de datos. No hay facturación electrónica, impuestos, conciliación bancaria, cuentas por pagar o devoluciones parciales. El costo de entradas se declara como pagado en efectivo o transferencia; no se ofrecen compras a crédito en la interfaz.
+
+La app no puede inferir compras que no se registran, pérdidas desconocidas ni demanda durante agotamientos. Antes de un uso real, exportar el respaldo anterior, verificar saldos migrados y ejecutar el flujo con comerciantes. No fusionar/publicar automáticamente esta propuesta sobre la versión actual.

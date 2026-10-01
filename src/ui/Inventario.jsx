@@ -124,6 +124,14 @@ export default function Inventario({ estado: s, actuar, ocupado }) {
           {p ? ` · ${p.nombre}` : ""}
         </h2>
         <Formulario className="formulario" onSubmit={guardar}>
+          {["nuevo", "editar"].includes(vista) && (
+            <Campo
+              label="Nombre del producto"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              required
+            />
+          )}
           {vista === "nuevo" && (
             <Campo label="¿Cómo vendes este producto?">
               <select
@@ -137,28 +145,12 @@ export default function Inventario({ estado: s, actuar, ocupado }) {
             </Campo>
           )}
           {["nuevo", "editar"].includes(vista) && (
-            <>
-              <Campo
-                label="Nombre del producto"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                required
-              />
-              <Importe
-                label={`¿A cuánto vendes cada ${unidadTexto}?`}
-                value={precio}
-                onChange={(e) => setPrecio(e.target.value)}
-                required
-              />
-              <Campo
-                label="¿Con qué cantidad quieres que te avisemos para reponer?"
-                type="number"
-                min="0"
-                step={unidad === "unidad" ? "1" : "0.001"}
-                value={minimo}
-                onChange={(e) => setMinimo(e.target.value)}
-              />
-            </>
+            <Importe
+              label={`¿A cuánto vendes cada ${unidadTexto}?`}
+              value={precio}
+              onChange={(e) => setPrecio(e.target.value)}
+              required
+            />
           )}
           {["nuevo", "entrada"].includes(vista) && (
             <>
@@ -250,6 +242,22 @@ export default function Inventario({ estado: s, actuar, ocupado }) {
                 ? "Si compraste 10 por $7, escribe $0,70."
                 : `Divide el costo de la compra entre los ${unidad === "kg" ? "kilogramos" : "litros"}. Por ejemplo: $40 ÷ 50 = $0,80 por ${unidadTexto}.`}
             </small>
+          )}
+          {["nuevo", "editar"].includes(vista) && (
+            <div>
+              <h3>Aviso para reponer (opcional)</h3>
+              <Campo
+                label="¿Con qué cantidad quieres que te avisemos para reponer?"
+                type="number"
+                min="0"
+                step={unidad === "unidad" ? "1" : "0.001"}
+                value={minimo}
+                onChange={(e) => setMinimo(e.target.value)}
+              />
+              <small>
+                Si lo dejas vacío, te avisaremos cuando se agote el producto.
+              </small>
+            </div>
           )}
           {porEnvases && ["nuevo", "entrada"].includes(vista) && compra && (
             <div className="nota" aria-live="polite">

@@ -68,7 +68,12 @@ export default function Caja({ estado: s, actuar, ocupado }) {
         </div>
       )}
       <section>
-        <h3>Registrar movimiento</h3>
+        <h3>Registrar movimiento en caja</h3>
+        <p>
+          Registra aquí gastos de la tienda, dinero que añades o dinero que
+          retiras para uso personal. Elige efectivo o transferencia según cómo
+          se movió el dinero.
+        </p>
         <Formulario
           className="formulario"
           onSubmit={async (e) => {
@@ -106,8 +111,10 @@ export default function Caja({ estado: s, actuar, ocupado }) {
           />
           <Metodo valor={metodo} cambiar={setMetodo} />
           <p>
-            La mercadería se registra en Reponer inventario. Aportes y retiros
-            no son ventas ni gastos operativos.
+            Las ventas y los abonos se registran en Vender y Fiados; las compras
+            de productos, en Reponer. No vuelvas a anotarlos aquí. El dinero que
+            añades o retiras para ti no cuenta como una venta ni como un gasto
+            de la tienda.
           </p>
           <Boton disabled={ocupado}>Guardar movimiento de caja</Boton>
         </Formulario>
@@ -115,6 +122,14 @@ export default function Caja({ estado: s, actuar, ocupado }) {
       {abierto && (
         <section>
           <h3>Cerrar el día</h3>
+          <p>
+            Aliado calcula cuánto debería haber. Cuenta los billetes y monedas
+            que realmente tienes y escribe el total para compararlos.
+          </p>
+          <p>
+            Haz el conteo antes de retirar dinero para llevarlo a casa. Si ya lo
+            retiraste, registra ese retiro primero.
+          </p>
           <Formulario
             className="formulario"
             onSubmit={(e) => {
@@ -131,8 +146,10 @@ export default function Caja({ estado: s, actuar, ocupado }) {
             <Boton disabled={ocupado}>Guardar cierre</Boton>
           </Formulario>
           <p>
-            Una diferencia no cambia las ventas: queda registrada para revisar
-            faltantes o sobrantes.
+            Si las cantidades no coinciden, verás cuánto falta o sobra. Puede
+            haber un cobro, gasto o retiro sin registrar, o un error al dar
+            cambio o contar. Guardar el cierre no retira dinero ni modifica tus
+            ventas.
           </p>
         </section>
       )}

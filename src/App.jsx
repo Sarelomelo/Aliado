@@ -79,6 +79,7 @@ export default function App() {
     [mensaje, setMensaje] = useState(""),
     [ocupado, setOcupado] = useState(false),
     [cargando, setCargando] = useState(true),
+    [intentoCarga, setIntentoCarga] = useState(0),
     [carritos, setCarritos] = useState({ real: [], practica: [] });
   const base = useRef(null),
     candado = useRef(false),
@@ -135,18 +136,19 @@ export default function App() {
     return () => {
       vivo = false;
       db?.close();
+      if (base.current === db) base.current = null;
       canal.current?.close();
       window.removeEventListener("focus", actualizar);
       window.removeEventListener("unhandledrejection", capturar);
       window.removeEventListener("aliado-error", errorFormulario);
     };
-  }, []);
+  }, [intentoCarga]);
   async function actuar(tipo, datos) {
     if (candado.current) return false;
     candado.current = true;
     setOcupado(true);
     setError("");
-    setMensaje("");
+    setMensaje("Guardando…");
     try {
       const op = {
         id: crypto.randomUUID(),
@@ -167,6 +169,7 @@ export default function App() {
       return true;
     } catch (e) {
       setError(e.message);
+      setMensaje("");
       return false;
     } finally {
       candado.current = false;
@@ -280,10 +283,20 @@ export default function App() {
         </div>
       )}
       {cargando && !practica ? (
-        <p>Abriendo tus datos…</p>
+        <p role="status">Abriendo tus datos…</p>
       ) : !s ? (
         <section>
           <h2>No se pudieron cargar los datos</h2>
+          <Boton
+            secundario
+            onClick={() => {
+              setCargando(true);
+              setError("");
+              setIntentoCarga((n) => n + 1);
+            }}
+          >
+            Intentar abrir mis datos de nuevo
+          </Boton>
           <p>
             No se han reemplazado los registros anteriores. Descarga los
             originales y solicita soporte antes de borrar datos.

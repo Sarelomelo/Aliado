@@ -1,5 +1,5 @@
 import { descargar } from "./descargar.js";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cantidadTexto, dinero, reporte } from "../negocio.js";
 import { diaEcuador } from "../datos.js";
 import { Boton, Campo, Tarjeta, Fecha } from "./comun.jsx";
@@ -11,13 +11,19 @@ export default function Reportes({ estado: s, actuar, ocupado }) {
     [orden, setOrden] = useState("ventas"),
     [unidad, setUnidad] = useState("todas");
   const fechasValidas = desde && hasta && desde <= hasta;
-  const r = reporte(
-    s,
-    periodo === "personalizado"
-      ? fechasValidas
-        ? { inicio: desde, fin: hasta }
-        : "hoy"
-      : periodo,
+  const hoy = diaEcuador();
+  const r = useMemo(
+    () =>
+      reporte(
+        s,
+        periodo === "personalizado"
+          ? fechasValidas
+            ? { inicio: desde, fin: hasta }
+            : "hoy"
+          : periodo,
+        new Date(`${hoy}T12:00:00-05:00`),
+      ),
+    [s, periodo, fechasValidas, desde, hasta, hoy],
   );
   const productos = r.productos
     .filter((p) => unidad === "todas" || p.unidad === unidad)
@@ -99,22 +105,25 @@ export default function Reportes({ estado: s, actuar, ocupado }) {
       </p>
       <div className="indicadores">
         <Tarjeta
-          label="Ventas netas registradas"
+          label="Ventas registradas, descontando devoluciones"
           valor={dinero(r.ventasCents)}
         />
         <Tarjeta
-          label="Costo de productos vendidos"
+          label="Lo que te costaron los productos vendidos"
           valor={dinero(r.costoCents)}
         />
-        <Tarjeta label="Margen bruto" valor={dinero(r.margenCents)} />
         <Tarjeta
-          label="Pérdida por merma"
+          label="Lo que queda de las ventas antes de gastos y pérdidas"
+          valor={dinero(r.margenCents)}
+        />
+        <Tarjeta
+          label="Costo de los productos dañados o perdidos"
           valor={dinero(r.mermaCents)}
           tono="naranja"
         />
         <Tarjeta label="Gastos registrados" valor={dinero(r.gastosCents)} />
         <Tarjeta
-          label="Resultado operativo registrado"
+          label="Resultado después de gastos y productos perdidos"
           valor={dinero(r.resultadoCents)}
           detalle="Margen − merma − gastos"
         />

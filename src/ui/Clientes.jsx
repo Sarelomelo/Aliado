@@ -38,7 +38,7 @@ export default function Clientes({ estado: s, actuar, ocupado }) {
       <h2>Fiados y clientes</h2>
       <div className="indicadores">
         <Tarjeta
-          label="Saldo pendiente actual"
+          label="Total que tus clientes aún te deben"
           valor={dinero(s.deudas.reduce((a, d) => a + saldoDeuda(d), 0))}
         />
       </div>
@@ -225,7 +225,7 @@ export default function Clientes({ estado: s, actuar, ocupado }) {
                 }}
               >
                 <Importe
-                  label="Importe del abono"
+                  label="¿Cuánto te está pagando?"
                   value={monto}
                   onChange={(e) => setMonto(e.target.value)}
                   required

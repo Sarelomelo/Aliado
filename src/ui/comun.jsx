@@ -1,4 +1,9 @@
 import { cloneElement, useId, useState } from "react";
+const formatoFecha = new Intl.DateTimeFormat("es-EC", {
+  timeZone: "America/Guayaquil",
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 export function Formulario({ onSubmit, ...props }) {
   return (
@@ -61,15 +66,7 @@ export function Importe(props) {
 }
 
 export function Fecha({ valor }) {
-  return (
-    <time>
-      {new Date(valor).toLocaleString("es-EC", {
-        timeZone: "America/Guayaquil",
-        dateStyle: "medium",
-        timeStyle: "short",
-      })}
-    </time>
-  );
+  return <time>{formatoFecha.format(new Date(valor))}</time>;
 }
 
 export function Metodo({ valor, cambiar, pendiente = false, fiado = false }) {

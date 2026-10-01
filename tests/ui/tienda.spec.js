@@ -72,7 +72,9 @@ test("tienda real local: venta, alerta, merma, reposición, cierre y respaldo", 
   await configurar(page);
   await producto(page);
   await ir(page, "Caja");
-  await page.getByLabel("Dinero que tienes en caja al empezar el día").fill("20");
+  await page
+    .getByLabel("Dinero que tienes en caja al empezar el día")
+    .fill("20");
   await page.getByRole("button", { name: "Registrar fondo inicial" }).click();
   await ir(page, "Vender");
   await page.getByRole("button", { name: /^Leche/ }).click();
@@ -108,7 +110,9 @@ test("tienda real local: venta, alerta, merma, reposición, cierre y respaldo", 
   expect(s.productos[0].stockQ).toBe(6000);
   expect(s.productos[0].valorCents).toBe(470);
   await ir(page, "Caja");
-  await page.getByLabel("Efectivo contado al cerrar").fill("17");
+  await page
+    .getByLabel("¿Cuánto dinero contaste en caja al cerrar?")
+    .fill("17");
   await page
     .getByRole("button", { name: "Guardar cierre", exact: true })
     .click();
@@ -180,11 +184,11 @@ test("venta fiada, rechazo de sobrepago, cobro y anulación con devolución", as
   ).toBeVisible();
   await ir(page, "Fiados");
   await page.getByRole("button", { name: /^Rosa/ }).click();
-  await page.getByLabel("Importe del abono").fill("3");
+  await page.getByLabel("¿Cuánto te está pagando?").fill("3");
   await page.getByRole("button", { name: "Registrar abono" }).click();
   await expect(page.getByRole("alert")).toContainText("no superar el saldo");
   expect((await datos(page)).deudas[0].abonos).toHaveLength(0);
-  await page.getByLabel("Importe del abono").fill("1");
+  await page.getByLabel("¿Cuánto te está pagando?").fill("1");
   await page.getByRole("button", { name: "Registrar abono" }).click();
   await expect(page.getByRole("status")).toContainText("guardada");
   expect((await datos(page)).deudas[0].abonos[0].montoCents).toBe(100);
@@ -315,7 +319,9 @@ test("práctica muestra reportes por fechas y cabe en móvil y escritorio", asyn
   await expect(page.getByLabel("Desde", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Hasta", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Resultado operativo registrado", { exact: true }),
+    page.getByText("Resultado después de gastos y productos perdidos", {
+      exact: true,
+    }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -560,13 +566,44 @@ test("restaurar el documento txt compartido conserva todos los datos", async ({
   );
   const texto = await page.evaluate(() => window.documentoRespaldo);
   page.on("dialog", (dialog) => dialog.accept());
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "respaldo-whatsapp.txt",
-      mimeType: "text/plain",
-      buffer: Buffer.from(texto),
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "respaldo-whatsapp.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(texto),
+  });
   await expect(page.getByRole("status")).toContainText("Respaldo restaurado");
+  expect(await datos(page)).toEqual(antes);
+});
+
+test("carga detenida ofrece reintentar y recupera la tienda sin borrar datos", async ({
+  page,
+}) => {
+  await configurar(page);
+  await producto(page);
+  const antes = await datos(page);
+  await page.addInitScript(() => {
+    const original = window.indexedDB;
+    window.restaurarIndexedDB = () =>
+      Object.defineProperty(window, "indexedDB", {
+        configurable: true,
+        value: original,
+      });
+    Object.defineProperty(window, "indexedDB", {
+      configurable: true,
+      value: { open: () => ({}) },
+    });
+  });
+  await page.reload();
+  await expect(page.getByRole("alert")).toContainText("tardando en abrir", {
+    timeout: 12000,
+  });
+  await expect(
+    page.getByRole("button", { name: "Intentar abrir mis datos de nuevo" }),
+  ).toBeVisible();
+  await page.evaluate(() => window.restaurarIndexedDB());
+  await page
+    .getByRole("button", { name: "Intentar abrir mis datos de nuevo" })
+    .click();
+  await expect(page.getByRole("navigation")).toBeVisible();
   expect(await datos(page)).toEqual(antes);
 });

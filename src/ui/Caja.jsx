@@ -29,8 +29,8 @@ export default function Caja({ estado: s, actuar, ocupado }) {
       <h2>Caja y gastos</h2>
       <p>
         El dinero inicial es lo que tenías al empezar. El dinero que debería
-        haber ahora cambia con los cobros y pagos en efectivo que registras.
-        Los fiados sin cobrar y las transferencias no suman dinero en caja.
+        haber ahora cambia con los cobros y pagos en efectivo que registras. Los
+        fiados sin cobrar y las transferencias no suman dinero en caja.
       </p>
       {!abierto ? (
         <Formulario
@@ -61,7 +61,8 @@ export default function Caja({ estado: s, actuar, ocupado }) {
             detalle="Calculado con el dinero inicial y los movimientos registrados; compruébalo contando tu caja."
           />
           <Tarjeta
-            label="Movimiento neto en transferencias hoy"
+            label="Transferencias recibidas menos pagos de hoy"
+            detalle="No es el saldo de tu cuenta bancaria."
             valor={dinero(movs.reduce((sum, m) => sum + m.transferCents, 0))}
           />
         </div>
@@ -86,19 +87,19 @@ export default function Caja({ estado: s, actuar, ocupado }) {
         >
           <Campo label="Tipo de movimiento">
             <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-              <option value="gasto">Gasto operativo</option>
-              <option value="aporte">Aporte del propietario</option>
+              <option value="gasto">Gasto de la tienda</option>
+              <option value="aporte">Dinero que añades a la tienda</option>
               <option value="retiro">Retiro personal</option>
             </select>
           </Campo>
           <Campo
-            label="Concepto"
+            label="¿Para qué fue este movimiento?"
             value={concepto}
             onChange={(e) => setConcepto(e.target.value)}
             required
           />
           <Importe
-            label="Importe del movimiento"
+            label="¿Cuánto dinero?"
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
             required
@@ -122,7 +123,7 @@ export default function Caja({ estado: s, actuar, ocupado }) {
             }}
           >
             <Importe
-              label="Efectivo contado al cerrar"
+              label="¿Cuánto dinero contaste en caja al cerrar?"
               value={contado}
               onChange={(e) => setContado(e.target.value)}
               required

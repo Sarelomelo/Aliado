@@ -20,12 +20,15 @@ const sumar = (xs) =>
     exigir(Number.isSafeInteger(s + x), "Total fuera de rango.");
     return s + x;
   }, 0);
-export const dinero = (v) =>
-  new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(
-    v / 100,
-  );
-export const cantidadTexto = (q) =>
-  new Intl.NumberFormat("es-EC", { maximumFractionDigits: 3 }).format(q / 1000);
+const formatoDinero = new Intl.NumberFormat("es-EC", {
+  style: "currency",
+  currency: "USD",
+});
+const formatoCantidad = new Intl.NumberFormat("es-EC", {
+  maximumFractionDigits: 3,
+});
+export const dinero = (v) => formatoDinero.format(v / 100);
+export const cantidadTexto = (q) => formatoCantidad.format(q / 1000);
 
 export function cantidad(v, unidad = "unidad") {
   exigir(

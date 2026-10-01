@@ -2,11 +2,15 @@ import { cantidadTexto, dinero, reporte } from "../negocio.js";
 import { diaEcuador } from "../datos.js";
 import { Boton, Tarjeta, Fecha } from "./comun.jsx";
 import { nombresMovimiento } from "./nombres.js";
+import { useMemo } from "react";
 
 export default function Inicio({ estado: s, navegar }) {
-  const r = reporte(s),
-    mes = reporte(s, "mes"),
-    bajos = s.productos.filter((p) => p.activo && p.stockQ <= p.minimoQ);
+  const hoy = diaEcuador();
+  const [r, mes] = useMemo(() => {
+    const fecha = new Date(`${hoy}T12:00:00-05:00`);
+    return [reporte(s, "hoy", fecha), reporte(s, "mes", fecha)];
+  }, [s, hoy]);
+  const bajos = s.productos.filter((p) => p.activo && p.stockQ <= p.minimoQ);
   const cierre = s.cierres.filter((c) => c.dia === diaEcuador()).at(-1);
   const pendiente =
     cierre &&
@@ -36,12 +40,13 @@ export default function Inicio({ estado: s, navegar }) {
           tono="naranja"
         />
         <Tarjeta
-          label="Merma de este mes"
+          label="Productos perdidos este mes"
+          detalle="Lo que te costaron los productos dañados o perdidos."
           valor={dinero(mes.mermaCents)}
           tono="naranja"
         />
         <Tarjeta
-          label="Inventario al costo"
+          label="Lo que te costó el inventario disponible"
           valor={dinero(r.inventarioCents)}
         />
       </div>

@@ -107,3 +107,63 @@ test("JSON antiguo corrupto no se sobrescribe ni se inicializa como vacío", asy
   await assert.rejects(leer(db));
   db.close();
 });
+
+test("apertura que no responde termina y cierra una conexión tardía", async () => {
+  const req = {};
+  await assert.rejects(
+    abrirBase({ open: () => req }, "bloqueada", 10),
+    /tardando en abrir/,
+  );
+  let cerrado = false;
+  req.result = {
+    close: () => {
+      cerrado = true;
+    },
+  };
+  req.onsuccess();
+  assert.equal(cerrado, true);
+});
+
+test("apertura bloqueada rechaza y cierra el resultado tardío", async () => {
+  const req = {};
+  const promesa = abrirBase({ open: () => req }, "bloqueada", 100);
+  req.onblocked();
+  await assert.rejects(promesa, /Cierra otras pestañas/);
+  let cerrado = false;
+  req.result = {
+    close: () => {
+      cerrado = true;
+    },
+  };
+  req.onsuccess();
+  assert.equal(cerrado, true);
+});
+
+test("transacción sin respuesta se aborta sin guardar", async () => {
+  let abortada = false;
+  const tx = {
+    objectStore: () => ({ get: () => ({}) }),
+    abort: () => {
+      abortada = true;
+      tx.onabort();
+    },
+  };
+  await assert.rejects(
+    guardarOperacion({ transaction: () => tx }, venta("no-guardada"), 10),
+    /operación se canceló/,
+  );
+  assert.equal(abortada, true);
+});
+
+test("recarga de tienda existente usa solo lectura", async () => {
+  const db = await base();
+  const original = db.transaction.bind(db);
+  const modos = [];
+  db.transaction = (n, modo) => {
+    modos.push(modo);
+    return original(n, modo);
+  };
+  await iniciar(db, storage);
+  assert.deepEqual(modos, ["readonly"]);
+  db.close();
+});
